@@ -1,0 +1,1499 @@
+import pygame
+import random
+import json
+import sys
+import time
+
+# --- Initialize Pygame ---
+pygame.init()   
+WIDTH, HEIGHT = 800, 600
+WIN = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Life Simulator 2D")
+
+# --- Colors ---
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+RED = (255, 0, 0)
+GREEN = (0, 255, 0) 
+ORANGE = (255, 165, 0)
+BLUE = (0, 128, 255)
+GRAY = (200, 200, 200)
+DARK_BLUE = (25, 25, 112)
+YELLOW = (255, 255, 0)
+
+# --- Fonts ---
+FONT = pygame.font.SysFont("arial", 24)
+BIG_FONT = pygame.font.SysFont("arial", 36)
+
+# --- Player stats ---
+Balance = 100
+hunger = 10
+energy = 10
+health = 10
+day = 1
+time_of_day = "Day"
+
+# --- Base Shop items (persistent definitions) ---
+base_foods = {
+    "apple": {"base_price": 5, "hunger": 2},
+    "orange": {"base_price": 7, "hunger": 4},
+    "banana": {"base_price": 10, "hunger": 8},
+    "watermelon": {"base_price": 20, "hunger": 10},
+    "sugar apple": {"base_price": 25, "hunger": 15},
+}
+base_energy_items = {
+    "coffee": {"base_price": 10, "energy": 3},
+    "energy drink": {"base_price": 15, "energy": 5},
+    "rest potion": {"base_price": 25, "energy": 10},
+}
+
+# We'll generate daily mutable price dicts from the base dicts
+foods = {k: {"price": v["base_price"], **{kk: vv for kk, vv in v.items() if kk != "base_price"}} for k, v in base_foods.items()}
+energy_items = {k: {"price": v["base_price"], **{kk: vv for kk, vv in v.items() if kk != "base_price"}} for k, v in base_energy_items.items()}
+
+# --- Seasonal and supermarket items (definitions include base prices & effects) ---
+seasonal_items_by_season = {
+    "Spring": {"salad": {"base_price": 8, "hunger": 5}},
+    "Summer": {"ice cream": {"base_price": 9, "hunger": 3, "energy": 2}},
+    "Autumn": {"pumpkin pie": {"base_price": 18, "hunger": 12}},
+    "Winter": {"hot chocolate": {"base_price": 12, "energy": 6}},
+}
+
+supermarket_items = {
+    "protein shake": {"base_price": 60, "energy": 8, "health": 2},
+    "gourmet meal": {"base_price": 120, "hunger": 25, "health": 5},
+}
+
+
+# Daily computed prices for seasonal & supermarket so they don't change each frame
+daily_seasonal_prices = {}
+daily_supermarket_prices = {}
+
+# --- Inventory ---
+inventory_foods = {food: 0 for food in foods}
+inventory_energy = {item: 0 for item in energy_items}
+# seasonal & supermarket items will be .setdefault when added
+
+# --- Jobs ---
+jobs = {
+    "cashier": (10, 20),
+    "programmer": (30, 80),
+    "gambler": (-50, 200),
+    # new jobs (ranges)
+    "chef": (15, 40),
+    "delivery": (20, 60),
+    "streamer": (5, 100),
+    "gd_runner": (50, 120),
+    "fishing": (5, 120),
+    "rhythm": (50,100),
+    "puzzle": (25,50),
+}
+
+# --- Seasons ---
+seasons = ["Spring", "Summer", "Autumn", "Winter"]
+days_per_season = 10
+season_index = 0
+
+def get_current_season():
+    return seasons[season_index]
+
+def update_season():
+    global season_index
+    season_index = (day - 1) // days_per_season % len(seasons)
+
+
+# --- Achievements ---
+achievements = {
+    "first_job": {"desc": "Complete your first job", "unlocked": False},
+    "wealthy": {"desc": "Reach £500 balance", "unlocked": False},
+    "survivor": {"desc": "Survive 10 days", "unlocked": False},
+    "foodie": {"desc": "Eat every type of food", "unlocked": False},
+}
+
+def check_achievements():
+    global achievements
+    if not achievements["first_job"]["unlocked"] and day > 1:
+        achievements["first_job"]["unlocked"] = True
+        show_message("Achievement unlocked: First Job!")
+    if not achievements["wealthy"]["unlocked"] and Balance >= 500:
+        achievements["wealthy"]["unlocked"] = True
+        show_message("Achievement unlocked: Wealthy!")
+    if not achievements["survivor"]["unlocked"] and day >= 10:
+        achievements["survivor"]["unlocked"] = True
+        show_message("Achievement unlocked: Survivor!")
+    if not achievements["foodie"]["unlocked"] and all(v > 0 for v in inventory_foods.values()):
+        achievements["foodie"]["unlocked"] = True
+        show_message("Achievement unlocked: Foodie!")
+
+# --- Button class ---
+class Button:
+    def __init__(self, x, y, w, h, text, color=GRAY, hover_color=(170, 170, 170)):
+        self.rect = pygame.Rect(x, y, w, h)
+        self.text = text
+        self.color = color
+        self.hover_color = hover_color
+
+    def draw(self, win):
+        mouse_pos = pygame.mouse.get_pos()
+        current_color = self.hover_color if self.rect.collidepoint(mouse_pos) else self.color
+        pygame.draw.rect(win, current_color, self.rect, border_radius=8)
+        txt = FONT.render(self.text, True, BLACK)
+        win.blit(txt, (self.rect.x + 10, self.rect.y + 10))
+
+    def is_clicked(self, pos):
+        return self.rect.collidepoint(pos)
+
+# --- Message system ---
+message = ""
+msg_timer = 0
+msg_color = GREEN
+
+def show_message(msg, color=GREEN):
+    global message, msg_timer, msg_color
+    message = msg
+    msg_timer = 120
+    msg_color = color
+
+def draw_message():
+    global msg_timer
+    if msg_timer > 0:
+        msg_txt = FONT.render(message, True, msg_color)
+        WIN.blit(msg_txt, (20, HEIGHT - 40))
+        msg_timer -= 1
+
+# --- Stat bars ---
+def draw_stat_bar(x, y, w, h, value, max_value, color, label):
+    pygame.draw.rect(WIN, BLACK, (x - 2, y - 2, w + 4, h + 4))
+    pygame.draw.rect(WIN, GRAY, (x, y, w, h))
+    fill_width = int((value / max_value) * w) if max_value != 0 else 0
+    pygame.draw.rect(WIN, color, (x, y, fill_width, h))
+    WIN.blit(FONT.render(label, True, BLACK), (x + w + 10, y))
+
+# --- Background colors ---
+day_color = pygame.Color(135, 206, 250)
+night_color = pygame.Color(25, 25, 112)
+bg_color = day_color
+
+def update_background(target):
+    global bg_color
+    r, g, b = bg_color.r, bg_color.g, bg_color.b
+    tr, tg, tb = target.r, target.g, target.b
+    if r < tr: r += 2
+    elif r > tr: r -= 2
+    if g < tg: g += 2
+    elif g > tg: g -= 2
+    if b < tb: b += 2
+    elif b > tb: b -= 2
+    bg_color = pygame.Color(r, g, b)
+
+# --- Random events & penalties ---
+def random_event():
+    global Balance, hunger, energy, health
+    chance = random.randint(1, 10)
+    if chance == 1:
+        Balance += 20
+        show_message("Lucky day! You found £20!")
+    elif chance == 2:
+        Balance = max(0, Balance - 15)
+        show_message("Oh no! You got pickpocketed!", RED)
+    elif chance == 3:
+        health -= 2
+        show_message("You caught a cold! Health -2", RED)
+    elif chance == 4:
+        energy -= 2
+        show_message("You slipped while working! Energy -2", RED)
+    elif chance == 5:
+        hunger += 5
+        show_message("Your friend gifted you lunch!")
+        if hunger > 10:
+            hunger = 10
+
+def exhaustion_penalty():
+    global health
+    if hunger <= 0:
+        health -= 2
+        show_message("Starving! Health -2", RED)
+    if energy <= 0:
+        health -= 2
+        show_message("Exhausted! Health -2", RED)
+
+# --- Status display ---
+def show_status():
+    draw_stat_bar(20, 20, 200, 25, health, 10, RED, "Health")
+    draw_stat_bar(20, 60, 200, 25, hunger, 10, ORANGE, "Hunger")
+    draw_stat_bar(20, 100, 200, 25, energy, 10, GREEN, "Energy")
+    WIN.blit(FONT.render(f"Balance: £{Balance}", True, BLUE), (20, 140))
+    WIN.blit(FONT.render(f"Day: {day} ({time_of_day})", True, BLACK), (20, 180))
+    WIN.blit(FONT.render(f"Season: {get_current_season()}", True, BLACK), (20, 220))
+
+# --- Buttons ---
+shop_btn = Button(600, 50, 150, 50, "Shop", color=ORANGE)
+work_btn = Button(600, 120, 150, 50, "Work", color=BLUE)
+day_btn = Button(600, 190, 150, 50, "Day", color=YELLOW)
+night_btn = Button(600, 260, 150, 50, "Night", color=DARK_BLUE)
+save_btn = Button(600, 330, 150, 50, "Save", color=GREEN)
+load_btn = Button(600, 400, 150, 50, "Load", color=GREEN)
+inv_btn = Button(600, 470, 150, 50, "Inventory", color=(0, 200, 0))
+ach_btn = Button(600, 540, 150, 50, "Achievements", color=(255, 165, 0))
+
+# --- Dynamic pricing & helper functions ---
+def clamp_price(p):
+    return max(1, int(round(p)))
+
+def update_daily_prices():
+    """Adjust food and energy prices slightly each day (±10% random by default)."""
+    global foods, energy_items, daily_seasonal_prices, daily_supermarket_prices
+    # update foods
+    for k, base in base_foods.items():
+        base_price = base["base_price"]
+        # +/- up to 10% random (less volatile than before)
+        factor = 1 + random.uniform(-0.10, 0.10)
+        new_price = clamp_price(base_price * factor)
+        foods[k]["price"] = new_price
+    # update energy items
+    for k, base in base_energy_items.items():
+        base_price = base["base_price"]
+        factor = 1 + random.uniform(-0.10, 0.10)
+        new_price = clamp_price(base_price * factor)
+        energy_items[k]["price"] = new_price
+    # compute seasonal item prices for the current season once per day
+    season = get_current_season()
+    daily_seasonal_prices = {}
+    seasonal = seasonal_items_by_season.get(season, {})
+    for sname, sinfo in seasonal.items():
+        # small variation but fixed for the day
+        factor = 1 + random.uniform(-0.07, 0.07)
+        daily_seasonal_prices[sname] = clamp_price(sinfo["base_price"] * factor)
+    # compute supermarket prices once per day (even if supermarket not unlocked yet)
+    daily_supermarket_prices = {}
+    for sname, sinfo in supermarket_items.items():
+        factor = 1 + random.uniform(-0.05, 0.10)
+        daily_supermarket_prices[sname] = clamp_price(sinfo["base_price"] * factor)
+
+def ensure_inventory_key(dict_ref, key):
+    if key not in dict_ref:
+        dict_ref[key] = 0
+
+# --- Shop (with scrolling support, seasonal items, supermarket unlock) ---
+def shop():
+    global Balance, foods, energy_items, inventory_foods, inventory_energy, daily_seasonal_prices, daily_supermarket_prices
+    choosing = True
+    shop_buttons = []
+    x, y = 50, 80
+
+    # Build all_items fresh every time so seasonal/supermarket items show correctly
+    def build_all_items():
+        items = []
+        # basic foods
+        for food, info in foods.items():
+            items.append((f"{food.capitalize()} - £{info['price']} (+{info.get('hunger',0)} hunger)", food, 'food', info['price']))
+        # energy items
+        for item, info in energy_items.items():
+            items.append((f"{item.capitalize()} - £{info['price']} (+{info.get('energy',0)} energy)", item, 'energy', info['price']))
+        # seasonal items for current season using daily prices
+        season = get_current_season()
+        seasonal = seasonal_items_by_season.get(season, {})
+        for sname, sinfo in seasonal.items():
+            price = daily_seasonal_prices.get(sname, clamp_price(sinfo["base_price"]))
+            items.append((f"{sname.capitalize()} (Seasonal) - £{price}", sname, 'seasonal', price))
+        # supermarket unlock
+        if day >= 20:
+            for sname, sinfo in supermarket_items.items():
+                price = daily_supermarket_prices.get(sname, clamp_price(sinfo["base_price"]))
+                items.append((f"{sname.capitalize()} (Supermarket) - £{price}", sname, 'supermarket', price))
+        return items
+
+    all_items = build_all_items()
+    scroll = 0
+    per_page = 6
+
+    while choosing:
+        target_color = day_color if time_of_day == "Day" else night_color
+        update_background(target_color)
+        WIN.fill(bg_color)
+        WIN.blit(BIG_FONT.render("Shop", True, BLACK), (50, 20))
+
+        # rebuild just in case day/season changed while in shop
+        all_items = build_all_items()
+        start_idx = scroll * per_page
+        visible = all_items[start_idx:start_idx + per_page]
+        shop_buttons = []
+        y = 80
+        for label, key, typ, price in visible:
+            shop_buttons.append((Button(50, y, 500, 40, label), key, typ, price))
+            y += 60
+
+        # Scroll hints
+        WIN.blit(FONT.render(f"Balance: £{Balance}", True, BLUE), (50, HEIGHT - 50))
+        WIN.blit(FONT.render("Use Up/Down arrows to scroll, Esc to exit", True, BLACK), (300, HEIGHT - 50))
+        for b, _, _, _ in shop_buttons: b.draw(WIN)
+        pygame.display.update()
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit(); sys.exit()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    choosing = False
+                elif event.key == pygame.K_DOWN:
+                    if (scroll + 1) * per_page < len(all_items):
+                        scroll += 1
+                elif event.key == pygame.K_UP:
+                    if scroll > 0:
+                        scroll -= 1
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                for b, key, typ, price in shop_buttons:
+                    if b.is_clicked(event.pos):
+                        # determine price and effects based on type
+                        if typ == 'food':
+                            info = foods[key]
+                            price = info['price']
+                            if Balance >= price:
+                                Balance -= price
+                                inventory_foods.setdefault(key, 0)
+                                inventory_foods[key] += 1
+                                show_message(f"You bought a {key.capitalize()}!")
+                            else:
+                                show_message("Not enough money!", RED)
+                        elif typ == 'energy':
+                            info = energy_items[key]
+                            price = info['price']
+                            if Balance >= price:
+                                Balance -= price
+                                inventory_energy.setdefault(key, 0)
+                                inventory_energy[key] += 1
+                                show_message(f"You bought a {key.capitalize()}!")
+                            else:
+                                show_message("Not enough money!", RED)
+                        elif typ == 'seasonal':
+                            sinfo = seasonal_items_by_season[get_current_season()][key]
+                            price = daily_seasonal_prices.get(key, clamp_price(sinfo["base_price"]))
+                            if Balance >= price:
+                                Balance -= price
+                                # treat seasonal as food if it has 'hunger', else energy
+                                if 'hunger' in sinfo:
+                                    inventory_foods.setdefault(key, 0)
+                                    inventory_foods[key] += 1
+                                else:
+                                    inventory_energy.setdefault(key, 0)
+                                    inventory_energy[key] += 1
+                                show_message(f"You bought a {key.capitalize()}!")
+                            else:
+                                show_message("Not enough money!", RED)
+                        elif typ == 'supermarket':
+                            sinfo = supermarket_items[key]
+                            price = daily_supermarket_prices.get(key, clamp_price(sinfo["base_price"]))
+                            if Balance >= price:
+                                Balance -= price
+                                # supermarket items are powerful: put in food inventory or energy as appropriate
+                                if 'hunger' in sinfo:
+                                    inventory_foods.setdefault(key, 0)
+                                    inventory_foods[key] += 1
+                                else:
+                                    inventory_energy.setdefault(key, 0)
+                                    inventory_energy[key] += 1
+                                show_message(f"You bought a {key.capitalize()} from the Supermarket!")
+                            else:
+                                show_message("Not enough money!", RED)
+
+# --- Inventory (with scrolling like shop) ---
+def inventory_screen():
+    global hunger, energy, inventory_foods, inventory_energy
+    choosing = True
+    scroll = 0
+    per_page = 6
+
+    def build_items_list():
+        # returns list of tuples (label, key, typ)
+        items = []
+        # list foods first
+        for food in inventory_foods.keys():
+            qty = inventory_foods.get(food, 0)
+            items.append((f"{food.capitalize()} x{qty}", food, 'food'))
+        # then energy items
+        for item in inventory_energy.keys():
+            qty = inventory_energy.get(item, 0)
+            items.append((f"{item.capitalize()} x{qty}", item, 'energy'))
+        return items
+
+    while choosing:
+        target_color = day_color if time_of_day == "Day" else night_color
+        update_background(target_color)
+        WIN.fill(bg_color)
+        WIN.blit(BIG_FONT.render("Inventory", True, BLACK), (50, 20))
+
+        all_items = build_items_list()
+        start_idx = scroll * per_page
+        visible = all_items[start_idx:start_idx + per_page]
+        inv_buttons = []
+        y = 80
+        for label, key, typ in visible:
+            inv_buttons.append((Button(50, y, 500, 40, label), key, typ))
+            y += 60
+
+        # Draw buttons
+        for b, _, _ in inv_buttons:
+            b.draw(WIN)
+
+        # Hints
+        WIN.blit(FONT.render("Use Up/Down arrows to scroll, Esc to exit", True, BLACK), (50, HEIGHT - 50))
+        pygame.display.update()
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit(); sys.exit()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    choosing = False
+                elif event.key == pygame.K_DOWN:
+                    if (scroll + 1) * per_page < len(all_items):
+                        scroll += 1
+                elif event.key == pygame.K_UP:
+                    if scroll > 0:
+                        scroll -= 1
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                for b, key, typ in inv_buttons:
+                    if b.is_clicked(event.pos):
+                        if typ == 'food':
+                            if inventory_foods.get(key, 0) > 0:
+                                # lookup hunger
+                                if key in foods:
+                                    hunger_gain = foods[key].get("hunger", 0)
+                                elif key in seasonal_items_by_season.get(get_current_season(), {}):
+                                    hunger_gain = seasonal_items_by_season[get_current_season()][key].get("hunger", 0)
+                                elif key in supermarket_items:
+                                    hunger_gain = supermarket_items[key].get("hunger", 0)
+                                else:
+                                    hunger_gain = 0
+                                # apply
+                                globals()['hunger'] = min(10, globals().get('hunger', 0) + hunger_gain)
+                                inventory_foods[key] -= 1
+                                show_message(f"You ate a {key.capitalize()}! Hunger +{hunger_gain}")
+                        elif typ == 'energy':
+                            if inventory_energy.get(key, 0) > 0:
+                                if key in energy_items:
+                                    energy_gain = energy_items[key].get("energy", 0)
+                                elif key in seasonal_items_by_season.get(get_current_season(), {}):
+                                    energy_gain = seasonal_items_by_season[get_current_season()][key].get("energy", 0)
+                                elif key in supermarket_items:
+                                    energy_gain = supermarket_items[key].get("energy", 0)
+                                else:
+                                    energy_gain = 0
+                                globals()['energy'] = min(10, globals().get('energy', 0) + energy_gain)
+                                # apply health from supermarket items if present
+                                if key in supermarket_items:
+                                    globals()['health'] = min(10, globals().get('health', 0) + supermarket_items[key].get("health", 0))
+                                inventory_energy[key] -= 1
+                                show_message(f"You used a {key.capitalize()}! Energy +{energy_gain}")
+
+# --- Achievements screen ---
+def achievements_screen():
+    choosing = True
+    while choosing:
+        target_color = day_color if time_of_day == "Day" else night_color
+        update_background(target_color)
+        WIN.fill(bg_color)
+        WIN.blit(BIG_FONT.render("Achievements", True, BLACK), (50, 20))
+        y = 80
+        for ach, info in achievements.items():
+            status = "Unlocked" if info["unlocked"] else "Locked"
+            text = f"{info['desc']} - {status}"
+            WIN.blit(FONT.render(text, True, GREEN if info["unlocked"] else RED), (50, y))
+            y += 50
+
+        pygame.display.update()
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT: pygame.quit(); sys.exit()
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE: choosing = False
+
+# --- Mini-Games ---
+def cashier_minigame():
+    price = random.randint(5, 20)
+    payment = random.choice([20, 50])
+    correct_change = payment - price
+
+    # create 3 options including correct one
+    options = [correct_change]
+    while len(options) < 3:
+        opt = correct_change + random.randint(-5, 5)
+        if opt not in options and opt >= 0:
+            options.append(opt)
+    random.shuffle(options)
+
+    btns = []
+    y = 250
+    for opt in options:
+        btns.append(Button(300, y, 200, 50, f"£{opt}", color=GRAY))
+        y += 70
+
+    choosing = True
+    result_income = 0
+    while choosing:
+        target_color = day_color if time_of_day == "Day" else night_color
+        update_background(target_color)
+        WIN.fill(bg_color)
+        WIN.blit(BIG_FONT.render("Cashier Job", True, BLACK), (280, 100))
+        WIN.blit(FONT.render(f"Item Price: £{price}", True, BLACK), (300, 160))
+        WIN.blit(FONT.render(f"Customer Paid: £{payment}", True, BLACK), (300, 190))
+        WIN.blit(FONT.render("Choose correct change:", True, BLACK), (280, 220))
+        for b in btns: b.draw(WIN)
+        pygame.display.update()
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT: pygame.quit(); sys.exit()
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                for b in btns:
+                    if b.is_clicked(event.pos):
+                        guess = int(b.text.replace("£", ""))
+                        if guess == correct_change:
+                            result_income = random.randint(jobs["cashier"][0], jobs["cashier"][1])
+                            show_message(f"Correct! You earned £{result_income}")
+                        else:
+                            result_income = random.randint(0, max(0, jobs["cashier"][0]))
+                            show_message(f"Wrong change! Only earned £{result_income}", RED)
+                        choosing = False
+    return result_income
+
+def programmer_minigame():
+    words = ["python", "debug", "script", "variable", "loop"]
+    target_word = random.choice(words)
+    typed = ""
+    choosing = True
+    result_income = 0
+    while choosing:
+        target_color = day_color if time_of_day == "Day" else night_color
+        update_background(target_color)
+        WIN.fill(bg_color)
+        WIN.blit(BIG_FONT.render("Programmer Job", True, BLACK), (260, 100))
+        WIN.blit(FONT.render(f"Type this word: {target_word}", True, BLACK), (250, 180))
+        WIN.blit(FONT.render(f"You typed: {typed}", True, BLUE), (250, 220))
+        WIN.blit(FONT.render("Press Enter when done", True, BLACK), (250, 260))
+        pygame.display.update()
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT: pygame.quit(); sys.exit()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_RETURN:
+                    if typed == target_word:
+                        result_income = random.randint(jobs["programmer"][0], jobs["programmer"][1])
+                        show_message(f"Perfect! You earned £{result_income}")
+                    else:
+                        result_income = random.randint(0, max(0, jobs["programmer"][0]))
+                        show_message(f"Typos! Only earned £{result_income}", RED)
+                    choosing = False
+                elif event.key == pygame.K_BACKSPACE:
+                    typed = typed[:-1]
+                else:
+                    # only add visible chars
+                    if len(event.unicode) == 1:
+                        typed += event.unicode
+    return result_income
+
+def gambler_minigame():
+    dealer = random.randint(2, 12)
+    player = random.randint(2, 12)
+    choosing = True
+    result_income = 0
+
+    higher_btn = Button(200, 300, 150, 60, "Higher")
+    lower_btn = Button(450, 300, 150, 60, "Lower")
+
+    while choosing:
+        target_color = day_color if time_of_day == "Day" else night_color
+        update_background(target_color)
+        WIN.fill(bg_color)
+        WIN.blit(BIG_FONT.render("Gambler Job", True, BLACK), (300, 100))
+        WIN.blit(FONT.render(f"Dealer rolled: {dealer}", True, BLACK), (320, 200))
+        WIN.blit(FONT.render("Will you roll Higher or Lower?", True, BLACK), (260, 250))
+        higher_btn.draw(WIN)
+        lower_btn.draw(WIN)
+        pygame.display.update()
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT: pygame.quit(); sys.exit()
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if higher_btn.is_clicked(event.pos):
+                    if player > dealer:
+                        result_income = random.randint(50, jobs["gambler"][1])
+                        show_message(f"You won £{result_income}!")
+                    else:
+                        result_income = random.randint(jobs["gambler"][0], 0)
+                        show_message(f"You lost £{-result_income}", RED)
+                    choosing = False
+                elif lower_btn.is_clicked(event.pos):
+                    if player < dealer:
+                        result_income = random.randint(50, jobs["gambler"][1])
+                        show_message(f"You won £{result_income}!")
+                    else:
+                        result_income = random.randint(jobs["gambler"][0], 0)
+                        show_message(f"You lost £{-result_income}", RED)
+                    choosing = False
+
+    return result_income
+
+# --- NEW: Chef minigame (memory/order) ---
+def chef_minigame():
+    ingredients_pool = ["Egg", "Milk", "Sugar", "Flour", "Butter", "Salt"]
+    # choose 3-4 ingredients to remember
+    seq_len = random.choice([3, 4])
+    sequence = [random.choice(ingredients_pool) for _ in range(seq_len)]
+    show_time_frames = 180  # frames to show sequence (~3s at 60FPS)
+    phase = "show"  # show -> choose
+    chosen = []
+    # build choice buttons (shuffle pool)
+    choices = random.sample(ingredients_pool, min(6, len(ingredients_pool)))
+    btns = []
+    # position buttons in two rows of up to 3
+    for idx, ch in enumerate(choices):
+        x = 50 + (idx % 3) * 250
+        y = 300 + (idx // 3) * 70
+        btns.append(Button(x, y, 230, 50, ch, color=GRAY))
+
+    timer = 0
+    choosing = True
+    result_income = 0
+    clock = pygame.time.Clock()
+    while choosing:
+        dt = clock.tick(60)
+        timer += 1
+        target_color = day_color if time_of_day == "Day" else night_color
+        update_background(target_color)
+        WIN.fill(bg_color)
+        WIN.blit(BIG_FONT.render("Chef Job", True, BLACK), (280, 80))
+        if phase == "show":
+            # show sequence clearly for the show_time_frames
+            WIN.blit(FONT.render("Memorize this ingredient sequence:", True, BLACK), (50, 140))
+            WIN.blit(FONT.render(" - ".join(sequence), True, BLUE), (50, 180))
+            if timer > show_time_frames:
+                phase = "choose"
+        else:
+            WIN.blit(FONT.render("Select in the same order:", True, BLACK), (50, 140))
+            WIN.blit(FONT.render(f"Chosen: {', '.join(chosen)}", True, BLUE), (50, 180))
+            for b in btns: b.draw(WIN)
+        pygame.display.update()
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit(); sys.exit()
+            if phase == "choose" and event.type == pygame.MOUSEBUTTONDOWN:
+                for b in btns:
+                    if b.is_clicked(event.pos):
+                        chosen.append(b.text)
+                        show_message(f"You picked {b.text}")
+                        if len(chosen) == len(sequence):
+                            # evaluate
+                            if chosen == sequence:
+                                result_income = random.randint(jobs["chef"][0], jobs["chef"][1])
+                                show_message(f"Great cooking! You earned £{result_income}")
+                            else:
+                                result_income = random.randint(0, max(0, jobs["chef"][0]))
+                                show_message(f"Burnt the dish! Earned £{result_income}", RED)
+                            choosing = False
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                choosing = False
+    return result_income
+
+# --- NEW: Delivery minigame (simple dodge) ---
+def delivery_minigame():
+    # Player controls a delivery box; avoid obstacles for 6 seconds
+    player_rect = pygame.Rect(380, 500, 40, 40)
+    obstacles = []
+    spawn_timer = 0
+    start_ticks = pygame.time.get_ticks()
+    duration_ms = 6000
+    speed = 4
+    result_income = 0
+    clock = pygame.time.Clock()
+    survived = True
+    while True:
+        dt = clock.tick(60)
+        elapsed = pygame.time.get_ticks() - start_ticks
+        if elapsed >= duration_ms:
+            break
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit(); sys.exit()
+        keys = pygame.key.get_pressed()
+        if keys[pygame.K_LEFT]:
+            player_rect.x -= 6
+        if keys[pygame.K_RIGHT]:
+            player_rect.x += 6
+        if keys[pygame.K_UP]:
+            player_rect.y -= 4
+        if keys[pygame.K_DOWN]:
+            player_rect.y += 4
+        # keep inside screen
+        player_rect.x = max(0, min(WIDTH - player_rect.width, player_rect.x))
+        player_rect.y = max(0, min(HEIGHT - player_rect.height, player_rect.y))
+
+        # spawn obstacles periodically
+        spawn_timer += 1
+        if spawn_timer > 20:
+            spawn_timer = 0
+            ox = random.randint(0, WIDTH - 30)
+            obstacles.append(pygame.Rect(ox, -30, 30, 30))
+
+        # move obstacles
+        for ob in obstacles:
+            ob.y += speed
+        # remove off-screen
+        obstacles = [o for o in obstacles if o.y < HEIGHT + 50]
+
+        # collision check
+        for ob in obstacles:
+            if player_rect.colliderect(ob):
+                survived = False
+                show_message("You crashed the delivery!", RED)
+                pygame.display.update()
+                pygame.time.delay(500)
+                break
+        if not survived:
+            break
+
+        # draw
+        target_color = day_color if time_of_day == "Day" else night_color
+        update_background(target_color)
+        WIN.fill(bg_color)
+        WIN.blit(BIG_FONT.render("Delivery Job - Dodge obstacles!", True, BLACK), (130, 60))
+        pygame.draw.rect(WIN, ORANGE, player_rect)
+        for ob in obstacles:
+            pygame.draw.rect(WIN, RED, ob)
+        remaining = max(0, duration_ms - elapsed) // 1000 + 1
+        WIN.blit(FONT.render(f"Time left: {remaining}s", True, BLACK), (50, 520))
+        pygame.display.update()
+
+    # determine reward
+    if survived:
+        result_income = random.randint(jobs["delivery"][0], jobs["delivery"][1])
+        show_message(f"Delivery complete! You earned £{result_income}")
+    else:
+        result_income = random.randint(0, max(0, jobs["delivery"][0]))
+        show_message(f"Failed delivery. Earned £{result_income}", RED)
+    return result_income#
+
+def gd_runner_minigame():
+    from collections import deque
+    import math, random, sys, pygame
+
+    mode = random.choice(["ship", "wave"])   #"cube", "wave",     thats removed for testing purposes
+    clock = pygame.time.Clock()
+    fixed_screen_x = 100
+    camera_x = 0.0
+    player_world_x = fixed_screen_x
+    obstacles = []
+    obstacle_timer = 0
+    distance = 0
+    survived = True
+    base_speed = random.choice([7.5,9.5,11.5,13.5])
+    speed = base_speed
+    paused = False
+
+    # minimal globals assumed present: WIDTH, HEIGHT, WIN, FONT, BIG_FONT, BLUE, BLACK, RED, day_color, night_color, bg_color, time_of_day, jobs, show_message, update_background
+
+    # parallax
+    far_parallax_factor, mid_parallax_factor = 0.3, 0.6
+    far_tile_w, mid_tile_w = 300, 180
+    far_tile_h, mid_tile_h = HEIGHT//3, HEIGHT//4
+    far_y, mid_y = 20, HEIGHT//3
+
+    # distance-based spawn guard (prevents overlapping ship tunnels)
+    last_tunnel_end = -999999.0   # world x of the rightmost edge of the last spawned tunnel
+    tunnel_end_buffer = 40        # extra spacing between tunnels; tune as needed
+
+    # mode setup
+    if mode=="cube":
+        player = pygame.Rect(fixed_screen_x, HEIGHT-70, 50, 50)
+        gravity, jump_strength, velocity_y = 1, -15, 0
+        was_on_ground = True
+    elif mode=="wave":
+        hitbox = pygame.Rect(fixed_screen_x, HEIGHT//2-10, 5, 5)
+        wave_v = 6
+        up_keys = [pygame.K_SPACE, pygame.K_UP, pygame.K_LEFT, pygame.K_RIGHT]
+        was_moving_up = False
+
+        # --- Wave rotation + trail state (added) ---
+        wave_angle = 0.0              # current angle in degrees
+        wave_angle_target = 0.0
+        wave_angle_speed = 10.0       # how fast angle moves toward target (higher = snappier)
+        wave_max_angle = 30.0         # degrees up/down tilt
+
+        # trail: store (x, y, life) where life goes from 1.0 -> 0.0
+        wave_trail = deque()          # newest appended at right
+        trail_max_len = 22
+        trail_spawn_interval = 0.03   # seconds between trail samples
+        _wave_last_trail = 0.0
+    else:  # ship
+        hitbox = pygame.Rect(fixed_screen_x, HEIGHT//2-15, 30, 20)
+        velocity_y = 0.0
+        ship_accel = 0.45
+        max_vel = 8.0
+        up_keys = [pygame.K_SPACE, pygame.K_UP, pygame.K_LEFT, pygame.K_RIGHT]
+
+    def clamp(v,a,b): return max(a,min(b,v))
+
+    # straight-fly tunnel generator for ship
+    # Now returns (list_of_rects, total_length) where total_length is meaningful for ship tunnels.
+    def spawn_obstacle(mode, spawn_x):
+        if mode=="cube":
+            h = random.randint(30,60)
+            rects = [pygame.Rect(spawn_x, HEIGHT-20-h, 30, h)]
+            return rects, 30
+        if mode=="wave":
+            gap_h = random.randint(75,100); gap_y = random.randint(50, HEIGHT-50-gap_h-20)
+            rects = [pygame.Rect(spawn_x,0,30,gap_y), pygame.Rect(spawn_x,gap_y+gap_h,30,HEIGHT-(gap_y+gap_h)-20)]
+            return rects, 30
+        # ship: long contiguous tunnel with small vertical drift and occasional pinches
+        segments = []
+        total_length = random.choice([ 300, 350, 400, 450])
+        seg_w = random.choice([36, 40, 44])
+        # gap height is now exactly twice the ship hitbox height
+        gap_h = hitbox.height * 4
+        # choose a single gap_y for the entire tunnel (uniform height between poles)
+        base_gap_y = random.randint(40, HEIGHT - 60 - gap_h - 20)
+        x = spawn_x
+        remaining = total_length
+        while remaining > 0:
+            gap_y = base_gap_y  # no per-column drift for straight flying
+            if random.random() < 0.08:
+                pinch = random.randint(1, 10)
+                segments.append(pygame.Rect(x, 0, seg_w, gap_y))
+                segments.append(pygame.Rect(x, gap_y + (gap_h - pinch), seg_w, HEIGHT - (gap_y + (gap_h - pinch)) - 20))
+            else:
+                segments.append(pygame.Rect(x, 0, seg_w, gap_y))
+                segments.append(pygame.Rect(x, gap_y + gap_h, seg_w, HEIGHT - (gap_y + gap_h) - 20))
+            step = random.choice([40, 48, 56])
+            x += step
+            remaining -= step
+        return segments, total_length
+
+    class ObstaclePool:
+        def __init__(self): self.pool = deque()
+        def get(self, sx, m):
+            rects, total_len = spawn_obstacle(m, sx)
+            return rects, total_len
+        def recycle(self, o):
+            try: o.x = -9999; o.y = -9999; self.pool.append(o)
+            except: pass
+
+    ob_pool = ObstaclePool()
+
+    class Particle:
+        __slots__=("x","y","vx","vy","life","max_life","color","size")
+        def __init__(self): self.x=self.y=self.vx=self.vy=0.0; self.life=0.0; self.max_life=1.0; self.color=(255,255,255); self.size=2
+        def init(self,x,y,vx,vy,life,color,size): self.x,self.y,self.vx,self.vy,self.life,self.max_life,self.color,self.size = x,y,vx,vy,life,life,color,size
+        def update(self,dt):
+            self.life -= dt
+            if self.life>0:
+                self.x += self.vx*dt; self.y += self.vy*dt; self.vy += 300*dt; return True
+            return False
+
+    class ParticlePool:
+        def __init__(self,capacity=300): self.pool=[Particle() for _ in range(capacity)]; self.active=[]
+        def spawn(self,x,y,count=8,angle_spread=0.8,speed=120,life=0.6,color=(255,200,50),size=3):
+            for _ in range(count):
+                if not self.pool: break
+                p=self.pool.pop(); angle=random.uniform(-math.pi/2-angle_spread,-math.pi/2+angle_spread)
+                spd=random.uniform(speed*0.6,speed*1.1); p.init(x,y,math.cos(angle)*spd,math.sin(angle)*spd,random.uniform(life*0.6,life*1.1),color,size); self.active.append(p)
+        def update(self,dt):
+            i=0
+            while i<len(self.active):
+                p=self.active[i]
+                if not p.update(dt): self.pool.append(p); self.active.pop(i)
+                else: i+=1
+        def draw(self,surf):
+            for p in self.active: pygame.draw.circle(surf,p.color,(int(p.x),int(p.y)),p.size)
+
+    particle_pool = ParticlePool(300)
+
+    while True:
+        dt = clock.tick(60); dt_s = dt/1000.0
+        for event in pygame.event.get():
+            if event.type==pygame.QUIT: pygame.quit(); sys.exit()
+            if event.type==pygame.KEYDOWN:
+                if event.key==pygame.K_p: paused = not paused
+                if mode=="cube" and event.key in (pygame.K_SPACE,pygame.K_UP,pygame.K_LEFT,pygame.K_RIGHT):
+                    if player.bottom >= HEIGHT-20:
+                        velocity_y = jump_strength; was_on_ground=False
+                        particle_pool.spawn(fixed_screen_x+player.width//2, player.bottom-6, count=10, speed=140, life=0.45, color=(255,255,200), size=2)
+                if mode=="wave" and event.key in up_keys:
+                    particle_pool.spawn(fixed_screen_x+hitbox.width//2, hitbox.centery, count=6, speed=100, life=0.35, color=(200,230,255), size=2)
+                if mode=="ship" and event.key in up_keys:
+                    particle_pool.spawn(fixed_screen_x+hitbox.width//2, hitbox.bottom, count=6, speed=100, life=0.35, color=(255,180,80), size=2)
+
+        while paused:
+            for event in pygame.event.get():
+                if event.type==pygame.QUIT: pygame.quit(); sys.exit()
+                if event.type==pygame.KEYDOWN and event.key==pygame.K_p: paused=False
+            WIN.blit(FONT.render("PAUSED - Press P to resume", True, RED), (WIDTH//2-120, HEIGHT//2)); pygame.display.update(); clock.tick(10)
+
+        speed = base_speed
+        obstacle_timer_threshold = max(18, 70 - distance//300) + (12 if mode=="ship" else 0)
+
+        if mode=="cube":
+            velocity_y += gravity; player.y += velocity_y
+            if player.bottom >= HEIGHT-20:
+                player.bottom = HEIGHT-20
+                if velocity_y>0 and not was_on_ground:
+                    particle_pool.spawn(fixed_screen_x+player.width//2, player.bottom-4, count=14, speed=120, life=0.5, color=(200,180,140), size=3)
+                    was_on_ground=True
+                velocity_y = 0
+        elif mode=="wave":
+            keys = pygame.key.get_pressed()
+            moving_up = any(keys[k] for k in up_keys)
+
+            # set target angle: negative = nose up, positive = nose down
+            wave_angle_target = -wave_max_angle if moving_up else wave_max_angle
+
+            # smooth angle interpolation (frame-rate independent)
+            lerp_t = 1.0 - math.exp(-wave_angle_speed * dt_s)
+            wave_angle += (wave_angle_target - wave_angle) * lerp_t
+
+            # vertical movement (unchanged)
+            if moving_up and not was_moving_up:
+                particle_pool.spawn(fixed_screen_x + hitbox.width // 2, hitbox.centery, count=6, speed=90, life=0.35, color=(200,230,255), size=2)
+            was_moving_up = moving_up
+            hitbox.y += -wave_v if moving_up else wave_v
+            hitbox.y = clamp(hitbox.y, 0, HEIGHT - hitbox.height - 20)
+
+            # trail sampling (time-based so it is stable across framerates)
+            _wave_last_trail += dt_s
+            if _wave_last_trail >= trail_spawn_interval:
+                _wave_last_trail = 0.0
+                trail_x = fixed_screen_x + hitbox.width // 2
+                trail_y = hitbox.centery
+                wave_trail.append((trail_x, trail_y, 1.0))
+                while len(wave_trail) > trail_max_len:
+                    wave_trail.popleft()
+
+            # decay trail life each frame (mutate in place)
+            if wave_trail:
+                new_trail = deque()
+                decay = dt_s * 1.6
+                for (tx, ty, life) in wave_trail:
+                    life -= decay
+                    if life > 0:
+                        new_trail.append((tx, ty, life))
+                wave_trail = new_trail
+        else:
+            keys = pygame.key.get_pressed(); moving_up = any(keys[k] for k in up_keys)
+            velocity_y += -ship_accel if moving_up else ship_accel
+            velocity_y = clamp(velocity_y, -max_vel, max_vel)
+            hitbox.y += velocity_y
+            hitbox.y = clamp(hitbox.y, 0, HEIGHT-hitbox.height-20)
+
+        world_advance = speed * (dt / 16.0)
+        player_world_x += world_advance; camera_x += world_advance
+
+        # spawn guard: ensure spawn_x is beyond last_tunnel_end + buffer to avoid overlap
+        spawn_x = camera_x + WIDTH + 50
+        obstacle_timer += 1
+        if spawn_x > last_tunnel_end + tunnel_end_buffer:
+            if obstacle_timer > obstacle_timer_threshold:
+                obstacle_timer = 0
+                new_obs, new_length = ob_pool.get(int(spawn_x), mode)
+                obstacles.extend(new_obs)
+                # update last_tunnel_end for ship tunnels (or compute from rects as fallback)
+                try:
+                    # prefer using returned new_length for ship tunnels
+                    last_tunnel_end = float(spawn_x + new_length)
+                except:
+                    # fallback: compute rightmost edge from rects
+                    max_end = max((r.x + r.width) for r in new_obs)
+                    last_tunnel_end = float(max_end)
+
+        active = []
+        for o in obstacles:
+            if o.right > camera_x: active.append(o)
+            else: ob_pool.recycle(o)
+        obstacles = active
+
+        if mode=="cube":
+            player_world_rect = pygame.Rect(player_world_x, player.y, player.width, player.height)
+        else:
+            player_world_rect = pygame.Rect(player_world_x, hitbox.y, hitbox.width, hitbox.height)
+
+        if any(player_world_rect.colliderect(ob) for ob in obstacles):
+            survived = False
+            coll = next((ob for ob in obstacles if player_world_rect.colliderect(ob)), None)
+            if coll:
+                screen_x = coll.x - camera_x; cx = int(screen_x + coll.width//2); cy = int(coll.y + coll.height//2)
+                particle_pool.spawn(cx, cy, count=40, speed=220, life=1.0, color=(180,40,40), size=3)
+            show_message("You crashed!" if mode in ("wave","ship") else "You hit an obstacle!", RED)
+            pygame.display.update(); pygame.time.delay(500); break
+
+        target_color = day_color if time_of_day == "Day" else night_color
+        update_background(target_color); WIN.fill(bg_color)
+
+        far_offset = camera_x * far_parallax_factor; start_idx = int(far_offset // far_tile_w)
+        for i in range(start_idx-1, start_idx + (WIDTH//far_tile_w) + 3):
+            tile_world_x = i * far_tile_w; tile_screen_x = int(tile_world_x - far_offset)
+            pygame.draw.rect(WIN, (180,210,255), (tile_screen_x, far_y, far_tile_w-6, far_tile_h))
+
+        mid_offset = camera_x * mid_parallax_factor; start_idx = int(mid_offset // mid_tile_w)
+        for i in range(start_idx-1, start_idx + (WIDTH//mid_tile_w) + 3):
+            tile_world_x = i * mid_tile_w; tile_screen_x = int(tile_world_x - mid_offset)
+            pygame.draw.rect(WIN, (140,180,230), (tile_screen_x, mid_y, mid_tile_w-8, mid_tile_h))
+
+        if mode=="cube":
+            pygame.draw.rect(WIN, BLUE, pygame.Rect(fixed_screen_x, player.y, player.width, player.height))
+        elif mode=="wave":
+            # draw trail (oldest to newest)
+            trail_surf = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+            for (tx, ty, life) in wave_trail:
+                alpha = int(180 * life)
+                size = int(6 + 8 * life)
+                color = (120, 200, 255, alpha)
+                pygame.draw.circle(trail_surf, color, (int(tx), int(ty)), size)
+                # subtle glow behind
+                glow_alpha = int(40 * life)
+                if glow_alpha > 0:
+                    glow_color = (120, 200, 255, glow_alpha)
+                    pygame.draw.circle(trail_surf, glow_color, (int(tx), int(ty)), max(1, size+6))
+            WIN.blit(trail_surf, (0,0))
+
+            # draw rotated wave triangle at fixed screen X
+            px = fixed_screen_x + hitbox.width // 2
+            py = hitbox.centery
+            tri = [(-12, -10), (-12, 10), (14, 0)]
+            a = math.radians(wave_angle)
+            cos_a = math.cos(a); sin_a = math.sin(a)
+            rotated = []
+            for (ox, oy) in tri:
+                rx = ox * cos_a - oy * sin_a
+                ry = ox * sin_a + oy * cos_a
+                rotated.append((px + rx, py + ry))
+            pygame.draw.polygon(WIN, BLUE, rotated)
+        else:
+            ship_rect = pygame.Rect(fixed_screen_x, hitbox.y, hitbox.width, hitbox.height)
+            pygame.draw.rect(WIN, BLUE, ship_rect)
+            nose = [(ship_rect.right, ship_rect.top),(ship_rect.right, ship_rect.bottom),(ship_rect.right+12, ship_rect.centery)]
+            pygame.draw.polygon(WIN, BLUE, nose)
+
+        for ob in obstacles:
+            screen_x = ob.x - camera_x
+            pygame.draw.rect(WIN, BLACK, pygame.Rect(int(screen_x), ob.y, ob.width, ob.height))
+
+        particle_pool.update(dt_s); particle_pool.draw(WIN)
+
+        distance = camera_x
+        WIN.blit(FONT.render(f"Distance: {int(distance)//10}", True, BLACK), (50,50))
+        title = "Geometry Dash Job" if mode=="cube" else "Geometry Dash - Wave Challenge" if mode=="wave" else "Geometry Dash - Ship Straight Fly"
+        WIN.blit(BIG_FONT.render(title, True, BLACK), (130,20))
+        if mode in ("wave","ship"):
+            WIN.blit(FONT.render("Hold Space/Up/Left/Right to rise; release to fall", True, BLACK), (50, HEIGHT-40))
+        pygame.display.update()
+
+    base_reward = jobs.get("gd_runner",(50,120))
+    if survived: result_income = random.randint(*base_reward) + int(distance)//100
+    else: result_income = random.randint(0, base_reward[0])
+    show_message(f"{'Perfect run!' if survived and mode=='cube' else 'Perfect wave!' if survived and mode=='wave' else 'Perfect flight!' if survived else 'Run failed.'} Earned £{result_income}", RED if not survived else BLACK)
+    return int(result_income)
+
+
+#NEW: Streamer minigame (typing for donations) ---
+def streamer_minigame():
+    words = ["hey", "rip", "gg", "noob", "stream", "chat", "imagine", "play", "lol", "tuff"]
+    time_limit = 10000  # ms
+    start_time = pygame.time.get_ticks()
+    typed_count = 0
+    current_input = ""
+    showing_word = random.choice(words)
+    result_income = 0
+    choosing = True
+    while choosing:
+        elapsed = pygame.time.get_ticks() - start_time
+        if elapsed > time_limit:
+            break
+        target_color = day_color if time_of_day == "Day" else night_color
+        update_background(target_color)
+        WIN.fill(bg_color)
+        WIN.blit(BIG_FONT.render("Streamer Job - Type words quickly!", True, BLACK), (90, 60))
+        WIN.blit(FONT.render(f"Type this word: {showing_word}", True, BLACK), (250, 140))
+        WIN.blit(FONT.render(f"You typed: {current_input}", True, BLUE), (250, 180))
+        remaining_s = max(0, (time_limit - elapsed) // 1000)
+        WIN.blit(FONT.render(f"Time left: {remaining_s}s", True, BLACK), (50, 520))
+        pygame.display.update()
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT: pygame.quit(); sys.exit()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_RETURN:
+                    if current_input.strip().lower() == showing_word:
+                        typed_count += 1
+                        # donation increases with correct entries
+                        result_income += random.randint(5, 20)
+                        showing_word = random.choice(words)
+                        current_input = ""
+                    else:
+                        # small penalty or no donation
+                        showing_word = random.choice(words)
+                        current_input = ""
+                elif event.key == pygame.K_BACKSPACE:
+                    current_input = current_input[:-1]
+                else:
+                    if len(event.unicode) == 1:
+                        current_input += event.unicode
+    # final reward scaled
+    if result_income == 0:
+        result_income = random.randint(0, max(0, jobs["streamer"][0]))
+    else:
+        result_income = min(result_income, jobs["streamer"][1])
+    show_message(f"Streaming ended: Donations £{result_income}")
+    return result_income
+
+def fishing_minigame():
+    choosing = True
+    clock = pygame.time.Clock()
+    bite_timer = random.randint(60, 240)  # frames until bite
+    timer = 0
+    phase = "waiting"  # waiting -> hook -> reel
+    meter_pos = 0
+    meter_dir = 1
+    success = False
+    reward = None
+
+    while choosing:
+        dt = clock.tick(60)
+        timer += 1
+        target_color = day_color if time_of_day == "Day" else night_color
+        update_background(target_color)
+        WIN.fill(bg_color)
+        WIN.blit(BIG_FONT.render("Fishing", True, BLACK), (300, 60))
+
+        if phase == "waiting":
+            WIN.blit(FONT.render("Waiting for a bite...", True, BLACK), (260, 140))
+            # simple indicator
+            WIN.blit(FONT.render(f"Patience: {max(0, bite_timer - timer)}", True, BLUE), (320, 180))
+            if timer >= bite_timer:
+                phase = "hook"
+                timer = 0
+                show_message("Bite! Press Space to Hook!")
+        elif phase == "hook":
+            WIN.blit(FONT.render("Press Space to hook now!", True, BLACK), (240, 140))
+        elif phase == "reel":
+            # timing meter: success zone in middle
+            meter_w, meter_h = 400, 30
+            mx, my = 200, 220
+            pygame.draw.rect(WIN, GRAY, (mx, my, meter_w, meter_h))
+            # success zone
+            sz_w = int(meter_w * 0.2)
+            sz_x = mx + (meter_w // 2) - (sz_w // 2)
+            pygame.draw.rect(WIN, GREEN, (sz_x, my, sz_w, meter_h))
+            # moving cursor
+            cursor_x = mx + meter_pos
+            pygame.draw.rect(WIN, RED, (cursor_x, my, 6, meter_h))
+            WIN.blit(FONT.render("Stop the cursor in the green zone!", True, BLACK), (220, 180))
+
+            # update cursor
+            meter_pos += meter_dir * 6
+            if meter_pos <= 0:
+                meter_dir = 1
+            if meter_pos >= meter_w - 6:
+                meter_dir = -1
+
+        pygame.display.update()
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit(); sys.exit()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    choosing = False
+                if phase == "hook" and event.key == pygame.K_SPACE:
+                    phase = "reel"
+                    timer = 0
+                elif phase == "reel" and event.key == pygame.K_SPACE:
+                    # evaluate success
+                    meter_w = 400
+                    sz_w = int(meter_w * 0.2)
+                    mx = 200
+                    sz_x = mx + (meter_w // 2) - (sz_w // 2)
+                    cursor_x = mx + meter_pos
+                    if sz_x <= cursor_x <= sz_x + sz_w:
+                        success = True
+                    else:
+                        success = False
+                    # determine reward
+                    if success:
+                        # rarity roll
+                        r = random.random()
+                        if r < 0.6:
+                            item = "small fish"
+                            money = random.randint(5, 12)
+                        elif r < 0.9:
+                            item = "medium fish"
+                            money = random.randint(13, 30)
+                        else:
+                            item = "rare fish"
+                            money = random.randint(40, 80)
+                        inventory_foods.setdefault(item, 0)
+                        inventory_foods[item] += 1
+                        show_message(f"Caught a {item.capitalize()}! +£{money}")
+                        return money
+                    else:
+                        show_message("The fish got away!", RED)
+                        return 0
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                pass
+    return 0
+
+def rhythm_minigame():
+    pattern = random.choice([["a","s","d"], ["left","right","left","up"], ["j","k","l","k"]])
+    idx = 0
+    clock = pygame.time.Clock()
+    timer = 0
+    time_per_note = 60  # frames
+    choosing = True
+    score = 0
+
+    key_map = {
+        "left": pygame.K_LEFT, "right": pygame.K_RIGHT, "up": pygame.K_UP, "down": pygame.K_DOWN,
+        "a": pygame.K_a, "s": pygame.K_s, "d": pygame.K_d, "j": pygame.K_j, "k": pygame.K_k, "l": pygame.K_l
+    }
+
+    while choosing:
+        dt = clock.tick(60)
+        timer += 1
+        target_color = day_color if time_of_day == "Day" else night_color
+        update_background(target_color)
+        WIN.fill(bg_color)
+        WIN.blit(BIG_FONT.render("Rhythm Performance", True, BLACK), (200, 40))
+        WIN.blit(FONT.render(f"Hit: {pattern[idx]}", True, BLUE), (360, 140))
+        WIN.blit(FONT.render(f"Score: {score}", True, BLACK), (360, 180))
+        pygame.display.update()
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit(); sys.exit()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    choosing = False
+                # check expected key
+                expected = key_map.get(pattern[idx], None)
+                if expected and event.key == expected:
+                    # timing window: if pressed within time_per_note frames
+                    if timer <= time_per_note:
+                        score += 1
+                        show_message("Great timing!")
+                    else:
+                        score += 0
+                        show_message("Late!", RED)
+                    idx += 1
+                    timer = 0
+                    if idx >= len(pattern):
+                        choosing = False
+                else:
+                    # wrong key penalty
+                    score -= 1
+                    show_message("Miss!", RED)
+                    idx += 1
+                    timer = 0
+                    if idx >= len(pattern):
+                        choosing = False
+
+    # reward based on score
+    reward = max(0, score * 10)
+    if reward > 0:
+        show_message(f"Performance earned £{reward}")
+    else:
+        show_message("No fans today...", RED)
+    return reward
+
+
+
+
+# --- Work (player chooses job) ---
+def go_to_work():
+    global Balance, hunger, energy, day
+    choosing = True
+    # Job selection buttons (include new jobs)
+    cashier_btn = Button(120, 220, 150, 60, "Cashier", color=GRAY)
+    programmer_btn = Button(290, 220, 150, 60, "Programmer", color=GRAY)
+    gambler_btn = Button(460, 220, 150, 60, "Gambler", color=GRAY)
+    chef_btn = Button(120, 320, 150, 60, "Chef", color=ORANGE)
+    delivery_btn = Button(290, 320, 150, 60, "Delivery", color=ORANGE)
+    streamer_btn = Button(460, 320, 150, 60, "Streamer", color=ORANGE)
+    gd_runner_btn = Button(460, 450, 150, 60, "GD Runner", color=ORANGE)
+    fishing_btn = Button(290, 450, 150, 60, "Fish", color=ORANGE)
+    rhythm_btn = Button(120, 450, 150, 60, "Perform", color=ORANGE)
+    
+   
+
+
+
+    chosen_income = 0
+    while choosing:
+        target_color = day_color if time_of_day == "Day" else night_color
+        update_background(target_color)
+        WIN.fill(bg_color)
+        WIN.blit(BIG_FONT.render("Choose a Job", True, BLACK), (300, 140))
+        cashier_btn.draw(WIN)
+        programmer_btn.draw(WIN)
+        gambler_btn.draw(WIN)
+        chef_btn.draw(WIN)
+        delivery_btn.draw(WIN)
+        streamer_btn.draw(WIN)
+        gd_runner_btn.draw(WIN)
+        fishing_btn.draw(WIN)
+        rhythm_btn.draw(WIN)
+        WIN.blit(FONT.render("Esc to cancel / exit", True, BLACK), (50, 520))
+        pygame.display.update()
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit(); sys.exit()
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                choosing = False
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if cashier_btn.is_clicked(event.pos):
+                    chosen_income = cashier_minigame()
+                    choosing = False
+                elif programmer_btn.is_clicked(event.pos):
+                    chosen_income = programmer_minigame()
+                    choosing = False
+                elif gambler_btn.is_clicked(event.pos):
+                    chosen_income = gambler_minigame()
+                    choosing = False
+                elif chef_btn.is_clicked(event.pos):
+                    chosen_income = chef_minigame()
+                    choosing = False
+                elif delivery_btn.is_clicked(event.pos):
+                    chosen_income = delivery_minigame()
+                    choosing = False
+                elif streamer_btn.is_clicked(event.pos):
+                    chosen_income = streamer_minigame()
+                    choosing = False
+                elif gd_runner_btn.is_clicked(event.pos):
+                    chosen_income = gd_runner_minigame()
+                    choosing = False
+                elif fishing_btn.is_clicked(event.pos):
+                    chosen_income = fishing_minigame()
+                    choosing = False
+                elif rhythm_btn.is_clicked(event.pos):
+                    chosen_income = rhythm_minigame()
+                    choosing = False
+        
+    # After minigame result
+    Balance += chosen_income
+    hunger -= 2
+    energy -= 2
+    random_event()
+    day += 1
+    update_season()
+    update_daily_prices()  # new: prices change once per day
+    exhaustion_penalty()
+    check_achievements()
+
+# --- Save / Load ---
+def save_game():
+    with open("save.json", "w") as f:
+        json.dump({
+            "Balance": Balance,
+            "hunger": hunger,
+            "energy": energy,
+            "health": health,
+            "day": day,
+            "time_of_day": time_of_day,
+            "inventory_foods": inventory_foods,
+            "inventory_energy": inventory_energy,
+        }, f)
+    show_message("Game saved!")
+
+def load_game():
+    global Balance, hunger, energy, health, day, time_of_day, inventory_foods, inventory_energy
+    try:
+        with open("save.json") as f:
+            data = json.load(f)
+        Balance = data["Balance"]
+        hunger = data["hunger"]
+        energy = data["energy"]
+        health = data["health"]
+        day = data["day"]
+        time_of_day = data["time_of_day"]
+        inventory_foods = data.get("inventory_foods", inventory_foods)
+        inventory_energy = data.get("inventory_energy", inventory_energy)
+        update_season()
+        update_daily_prices()
+        check_achievements()
+        show_message("Game loaded!")
+    except FileNotFoundError:
+        show_message("No saved game found.", RED)
+
+def toggle_time(new_time):
+    global time_of_day
+    time_of_day = new_time
+    show_message(f"It is now {time_of_day}")
+
+# --- Start Menu ---
+def start_menu():
+    menu_running = True
+    start_btn = Button(300, 250, 200, 60, "Start Game", color=GREEN)
+    quit_btn = Button(300, 350, 200, 60, "Quit", color=RED)
+
+    while menu_running:
+        WIN.fill(day_color)
+        WIN.blit(BIG_FONT.render("Life Simulator 2D", True, BLACK), (220, 100))
+        start_btn.draw(WIN)
+        quit_btn.draw(WIN)
+        pygame.display.update()
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT: pygame.quit(); sys.exit()
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if start_btn.is_clicked(event.pos):
+                    menu_running = False
+                elif quit_btn.is_clicked(event.pos):
+                    pygame.quit(); sys.exit()
+
+# --- Initialize dynamic prices before starting ---
+update_season()
+update_daily_prices()
+
+# --- Main Loop ---
+clock = pygame.time.Clock()
+start_menu()
+running = True
+while running:
+    target_color = day_color if time_of_day == "Day" else night_color
+    update_background(target_color)
+    WIN.fill(bg_color)
+    show_status()
+    draw_message()
+
+    for btn in [shop_btn, work_btn, day_btn, night_btn, save_btn, load_btn, inv_btn, ach_btn]:
+        btn.draw(WIN)
+
+    pygame.display.update()
+
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            if shop_btn.is_clicked(event.pos):
+                shop()
+            elif work_btn.is_clicked(event.pos):
+                go_to_work()
+            elif day_btn.is_clicked(event.pos):
+                toggle_time("Day")
+            elif night_btn.is_clicked(event.pos):
+                toggle_time("Night")
+            elif save_btn.is_clicked(event.pos):
+                save_game()
+            elif load_btn.is_clicked(event.pos):
+                load_game()
+            elif inv_btn.is_clicked(event.pos):
+                inventory_screen()
+            elif ach_btn.is_clicked(event.pos):
+                achievements_screen()
+
+    if health <= 0:
+        WIN.fill(BLACK)
+        WIN.blit(BIG_FONT.render("You died! Game Over.", True, RED), (250, 250))
+        pygame.display.update()
+        pygame.time.delay(3000)
+        running = False
+
+    clock.tick(60)
+
+pygame.quit()
+
