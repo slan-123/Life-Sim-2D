@@ -1,4 +1,78 @@
-The game is simulating a virtual life where you can work, and play minigames.
-When  you do that, you lose hunger and energy.
-You earn money from working and you can buy food and drinks from the shop to stop hunger and energy. 
-There are achievements, day counts and seasons.
+# 🎮 Life Simulator 2D
+
+A 2D life simulation game built with **Python and Pygame**.
+
+The player manages their money, hunger, energy and health while progressing through different days and seasons. The game combines simulation systems with jobs, minigames, achievements and random events.
+
+## ✨ Features
+
+* 💰 **Economy system** with money and changing shop prices
+* 🎒 **Inventory system** for managing items and consumables
+* 💼 **Multiple jobs** with different gameplay mechanics
+* 🎮 **Job minigames**, including Geometry Dash-inspired gameplay
+* 🏆 **Achievement system** with unlockable goals
+* 🌦️ **Four seasons** and a day/night system
+* 🎲 **Random events** that can affect gameplay
+* 💾 **Save and load system** using JSON
+* ❤️ **Player stats** including health, hunger and energy
+* 💥 **Collision detection** and generated obstacles
+* ✨ **Particle effects** and parallax backgrounds
+* 🖥️ **Interactive UI** using reusable button components
+
+## 🛠️ Technologies
+
+* **Python**
+* **Pygame**
+* **JSON**
+* **Object-Oriented Programming**
+
+## 🚀 How to Run
+
+### 1. Install Python
+
+Make sure Python is installed on your computer.
+
+### 2. Install Pygame
+
+Open a terminal in the project folder and run:
+
+```bash
+python -m pip install pygame
+```
+
+### 3. Run the game
+
+Run the main Python file:
+
+```bash
+python main.py
+```
+
+> The exact filename may be different depending on the version of the project.
+
+## 🧠 What I Learned
+
+Building Life Simulator 2D helped me improve my understanding of:
+
+* Game loops and event handling
+* Object-oriented programming
+* Collision detection
+* User interface design
+* File handling and JSON data
+* Randomisation and procedural generation
+* Managing multiple game systems
+* Structuring a larger programming project
+
+One of the main challenges was making different systems work together, such as the economy, inventory, jobs, achievements and player progression.
+
+## 📸 Gameplay
+
+Gameplay screenshots will be added here in the future.
+
+## 📂 Project
+
+This project was created as part of my programming and Computer Science learning journey.
+
+**Author:** Mohammed Arslan
+
+**GitHub:** https://github.com/slan-123
