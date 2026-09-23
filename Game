@@ -1177,125 +1177,471 @@ def ensure_inventory_key(dict_ref, key):
 
 
 def shop():
-    global Balance, foods, energy_items, inventory_foods, inventory_energy, daily_seasonal_prices, daily_supermarket_prices
-    choosing = True
-    shop_buttons = []
-    x, y = 50, 80
 
+    global Balance, foods, energy_items, inventory_foods, inventory_energy, daily_seasonal_prices, daily_supermarket_prices
+
+    choosing = True
+
+    shop_buttons = []
 
     def build_all_items():
+
         items = []
-      
+
         for food, info in foods.items():
-            items.append((f"{food.capitalize()} - £{info['price']} (+{info.get('hunger',0)} hunger)", food, 'food', info['price']))
-     
+            items.append((
+                f"{food.capitalize()} - £{info['price']} (+{info.get('hunger', 0)} hunger)",
+                food,
+                'food',
+                info['price']
+            ))
+
         for item, info in energy_items.items():
-            items.append((f"{item.capitalize()} - £{info['price']} (+{info.get('energy',0)} energy)", item, 'energy', info['price']))
+            items.append((
+                f"{item.capitalize()} - £{info['price']} (+{info.get('energy', 0)} energy)",
+                item,
+                'energy',
+                info['price']
+            ))
 
         season = get_current_season()
         seasonal = seasonal_items_by_season.get(season, {})
+
         for sname, sinfo in seasonal.items():
-            price = daily_seasonal_prices.get(sname, clamp_price(sinfo["base_price"]))
-            items.append((f"{sname.capitalize()} (Seasonal) - £{price}", sname, 'seasonal', price))
-     
+
+            price = daily_seasonal_prices.get(
+                sname,
+                clamp_price(sinfo["base_price"])
+            )
+
+            items.append((
+                f"{sname.capitalize()} (Seasonal) - £{price}",
+                sname,
+                'seasonal',
+                price
+            ))
+
         if day >= 20:
+
             for sname, sinfo in supermarket_items.items():
-                price = daily_supermarket_prices.get(sname, clamp_price(sinfo["base_price"]))
-                items.append((f"{sname.capitalize()} (Supermarket) - £{price}", sname, 'supermarket', price))
+
+                price = daily_supermarket_prices.get(
+                    sname,
+                    clamp_price(sinfo["base_price"])
+                )
+
+                items.append((
+                    f"{sname.capitalize()} (Supermarket) - £{price}",
+                    sname,
+                    'supermarket',
+                    price
+                ))
+
         return items
 
     all_items = build_all_items()
+
     scroll = 0
     per_page = 6
 
     while choosing:
+
         target_color = day_color if time_of_day == "Day" else night_color
         update_background(target_color)
         WIN.fill(bg_color)
-        WIN.blit(BIG_FONT.render("Shop", True, BLACK), (50, 20))
 
-     
+        # UI colours
+        if time_of_day == "Day":
+
+            panel_color = (248, 249, 252)
+            card_color = (238, 240, 245)
+            border_color = (220, 222, 230)
+            text_color = BLACK
+            muted_color = (100, 105, 115)
+
+        else:
+
+            panel_color = (30, 30, 48)
+            card_color = (42, 42, 65)
+            border_color = (70, 70, 95)
+            text_color = WHITE
+            muted_color = (170, 170, 190)
+
+        # Main shop panel
+        pygame.draw.rect(
+            WIN,
+            panel_color,
+            (30, 20, 740, 560),
+            border_radius=20
+        )
+
+        pygame.draw.rect(
+            WIN,
+            border_color,
+            (30, 20, 740, 560),
+            2,
+            border_radius=20
+        )
+
+        # Title
+        title = BIG_FONT.render(
+            "Shop",
+            True,
+            text_color
+        )
+
+        WIN.blit(
+            title,
+            (55, 35)
+        )
+
+        # Season
+        season_text = FONT.render(
+            f"{get_current_season()} • Day {day}",
+            True,
+            muted_color
+        )
+
+        season_rect = season_text.get_rect(
+            midright=(735, 55)
+        )
+
+        WIN.blit(
+            season_text,
+            season_rect
+        )
+
+        # Balance card
+        balance_card = pygame.Rect(
+            55,
+            85,
+            680,
+            55
+        )
+
+        pygame.draw.rect(
+            WIN,
+            card_color,
+            balance_card,
+            border_radius=12
+        )
+
+        balance_label = FONT.render(
+            "Balance",
+            True,
+            muted_color
+        )
+
+        WIN.blit(
+            balance_label,
+            (75, 97)
+        )
+
+        balance_text = FONT.render(
+            f"£{Balance}",
+            True,
+            GREEN
+        )
+
+        balance_rect = balance_text.get_rect(
+            midright=(715, 112)
+        )
+
+        WIN.blit(
+            balance_text,
+            balance_rect
+        )
+
+        # Build visible items
         all_items = build_all_items()
-        start_idx = scroll * per_page
-        visible = all_items[start_idx:start_idx + per_page]
-        shop_buttons = []
-        y = 80
-        for label, key, typ, price in visible:
-            shop_buttons.append((Button(50, y, 500, 40, label), key, typ, price))
-            y += 60
 
-     
-        WIN.blit(FONT.render(f"Balance: £{Balance}", True, BLUE), (50, HEIGHT - 50))
-        WIN.blit(FONT.render("Use Up/Down arrows to scroll, Esc to exit", True, BLACK), (300, HEIGHT - 50))
-        for b, _, _, _ in shop_buttons: b.draw(WIN)
+        start_idx = scroll * per_page
+
+        visible = all_items[
+            start_idx:start_idx + per_page
+        ]
+
+        shop_buttons = []
+
+        y = 155
+
+        for label, key, typ, price in visible:
+
+            item_rect = pygame.Rect(
+                55,
+                y,
+                680,
+                52
+            )
+
+            pygame.draw.rect(
+                WIN,
+                card_color,
+                item_rect,
+                border_radius=12
+            )
+
+            pygame.draw.rect(
+                WIN,
+                border_color,
+                item_rect,
+                2,
+                border_radius=12
+            )
+
+            # Item type accent
+            if typ == "food":
+                accent_color = ORANGE
+
+            elif typ == "energy":
+                accent_color = BLUE
+
+            elif typ == "seasonal":
+                accent_color = GREEN
+
+            else:
+                accent_color = (150, 100, 220)
+
+            accent_rect = pygame.Rect(
+                55,
+                y,
+                6,
+                52
+            )
+
+            pygame.draw.rect(
+                WIN,
+                accent_color,
+                accent_rect,
+                border_radius=3
+            )
+
+            # Button sits over the card
+            button = Button(
+                65,
+                y + 6,
+                660,
+                40,
+                label,
+                color=card_color,
+                hover_color=(215, 220, 230)
+            )
+
+            shop_buttons.append(
+                (button, key, typ, price)
+            )
+
+            y += 62
+
+        # Navigation hint
+        hint = FONT.render(
+            "UP / DOWN    |    Mouse Wheel    |    ESC to exit",
+            True,
+            muted_color
+        )
+
+        hint_rect = hint.get_rect(
+            center=(WIDTH // 2, 535)
+        )
+
+        WIN.blit(
+            hint,
+            hint_rect
+        )
+
+        # Draw buttons
+        for b, _, _, _ in shop_buttons:
+            b.draw(WIN)
+
         pygame.display.update()
 
+        # Events
         for event in pygame.event.get():
+
             if event.type == pygame.QUIT:
-                pygame.quit(); sys.exit()
+
+                pygame.quit()
+                sys.exit()
+
             if event.type == pygame.KEYDOWN:
+
                 if event.key == pygame.K_ESCAPE:
+
                     choosing = False
+
                 elif event.key == pygame.K_DOWN:
+
                     if (scroll + 1) * per_page < len(all_items):
                         scroll += 1
+
                 elif event.key == pygame.K_UP:
+
                     if scroll > 0:
                         scroll -= 1
+
+            elif event.type == pygame.MOUSEWHEEL:
+
+                if event.y < 0:
+
+                    if (scroll + 1) * per_page < len(all_items):
+                        scroll += 1
+
+                elif event.y > 0:
+
+                    if scroll > 0:
+                        scroll -= 1
+
             if event.type == pygame.MOUSEBUTTONDOWN:
+
                 for b, key, typ, price in shop_buttons:
+
                     if b.is_clicked(event.pos):
-                   
+
                         if typ == 'food':
+
                             info = foods[key]
                             price = info['price']
+
                             if Balance >= price:
+
                                 Balance -= price
-                                inventory_foods.setdefault(key, 0)
+
+                                inventory_foods.setdefault(
+                                    key,
+                                    0
+                                )
+
                                 inventory_foods[key] += 1
-                                show_message(f"You bought a {key.capitalize()}!")
+
+                                show_message(
+                                    f"You bought a {key.capitalize()}!"
+                                )
+
                             else:
-                                show_message("Not enough money!", RED)
+
+                                show_message(
+                                    "Not enough money!",
+                                    RED
+                                )
+
                         elif typ == 'energy':
+
                             info = energy_items[key]
                             price = info['price']
+
                             if Balance >= price:
+
                                 Balance -= price
-                                inventory_energy.setdefault(key, 0)
+
+                                inventory_energy.setdefault(
+                                    key,
+                                    0
+                                )
+
                                 inventory_energy[key] += 1
-                                show_message(f"You bought a {key.capitalize()}!")
+
+                                show_message(
+                                    f"You bought a {key.capitalize()}!"
+                                )
+
                             else:
-                                show_message("Not enough money!", RED)
+
+                                show_message(
+                                    "Not enough money!",
+                                    RED
+                                )
+
                         elif typ == 'seasonal':
-                            sinfo = seasonal_items_by_season[get_current_season()][key]
-                            price = daily_seasonal_prices.get(key, clamp_price(sinfo["base_price"]))
+
+                            sinfo = seasonal_items_by_season[
+                                get_current_season()
+                            ][key]
+
+                            price = daily_seasonal_prices.get(
+                                key,
+                                clamp_price(
+                                    sinfo["base_price"]
+                                )
+                            )
+
                             if Balance >= price:
+
                                 Balance -= price
-                             
+
                                 if 'hunger' in sinfo:
-                                    inventory_foods.setdefault(key, 0)
+
+                                    inventory_foods.setdefault(
+                                        key,
+                                        0
+                                    )
+
                                     inventory_foods[key] += 1
+
                                 else:
-                                    inventory_energy.setdefault(key, 0)
+
+                                    inventory_energy.setdefault(
+                                        key,
+                                        0
+                                    )
+
                                     inventory_energy[key] += 1
-                                show_message(f"You bought a {key.capitalize()}!")
+
+                                show_message(
+                                    f"You bought a {key.capitalize()}!"
+                                )
+
                             else:
-                                show_message("Not enough money!", RED)
+
+                                show_message(
+                                    "Not enough money!",
+                                    RED
+                                )
+
                         elif typ == 'supermarket':
+
                             sinfo = supermarket_items[key]
-                            price = daily_supermarket_prices.get(key, clamp_price(sinfo["base_price"]))
+
+                            price = daily_supermarket_prices.get(
+                                key,
+                                clamp_price(
+                                    sinfo["base_price"]
+                                )
+                            )
+
                             if Balance >= price:
+
                                 Balance -= price
-                              
+
                                 if 'hunger' in sinfo:
-                                    inventory_foods.setdefault(key, 0)
+
+                                    inventory_foods.setdefault(
+                                        key,
+                                        0
+                                    )
+
                                     inventory_foods[key] += 1
+
                                 else:
-                                    inventory_energy.setdefault(key, 0)
+
+                                    inventory_energy.setdefault(
+                                        key,
+                                        0
+                                    )
+
                                     inventory_energy[key] += 1
-                                show_message(f"You bought a {key.capitalize()} from the Supermarket!")
+
+                                show_message(
+                                    f"You bought a {key.capitalize()} from the Supermarket!"
+                                )
+
                             else:
-                                show_message("Not enough money!", RED)
+
+                                show_message(
+                                    "Not enough money!",
+                                    RED
+                                )
+
+        clock.tick(60)
 
 
 def inventory_screen():
@@ -2771,7 +3117,8 @@ def go_to_work():
                     chosen_income = rhythm_minigame()
                     choosing = False
         
-  
+    if chosen_job is None:
+        return
     career_level = career_data[chosen_job]["level"]
     pay_bonus = get_career_pay_bonus(career_level)
 
