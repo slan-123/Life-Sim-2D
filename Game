@@ -3,6 +3,7 @@ import random
 import json
 import sys
 import time
+import os
 
 
 pygame.init()   
@@ -22,8 +23,19 @@ DARK_BLUE = (25, 25, 112)
 YELLOW = (255, 255, 0)
 
 
-FONT = pygame.font.SysFont("arial", 24)
-BIG_FONT = pygame.font.SysFont("arial", 36)
+
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+FONT = pygame.font.Font(
+    os.path.join(BASE_DIR, "assets", "fonts", "Poppins-Regular.ttf"),
+    22
+)
+
+BIG_FONT = pygame.font.Font(
+    os.path.join(BASE_DIR, "assets", "fonts", "Poppins-SemiBold.ttf"),
+    34
+)
 
 
 Balance = 100
@@ -88,6 +100,85 @@ jobs = {
     "rhythm": (50,100),
     "puzzle": (25,50),
 }
+career_data = {
+    "cashier": {"level": 1, "xp": 0},
+    "programmer": {"level": 1, "xp": 0},
+    "gambler": {"level": 1, "xp": 0},
+    "chef": {"level": 1, "xp": 0},
+    "delivery": {"level": 1, "xp": 0},
+    "streamer": {"level": 1, "xp": 0},
+    "gd_runner": {"level": 1, "xp": 0},
+    "fishing": {"level": 1, "xp": 0},
+    "rhythm": {"level": 1, "xp": 0},
+    "puzzle": {"level": 1, "xp": 0},
+}
+def career_xp_required(level):
+    return level * 100
+def get_career_title(level):
+    if level == 1:
+        return "Beginner"
+    elif level == 2:
+        return "Apprentice"
+    elif level == 3:
+        return "Skilled"
+    elif level == 4:
+        return "Professional"
+    elif level == 5:
+        return "Expert"
+    elif level == 6:
+        return "Veteran"
+    elif level == 7:
+        return "Master"
+    elif level == 8:
+        return "Elite"
+    elif level == 9:
+        return "Legend"
+    else:
+        return "Grandmaster"
+def get_career_pay_bonus(level):
+    if level <= 4:
+        return level * 10
+    else:
+        return 40 + (level - 4) * 20
+def check_career_level_up(job):
+    career = career_data[job]
+
+    while career["xp"] >= career_xp_required(career["level"]):
+        career["xp"] -= career_xp_required(career["level"])
+        career["level"] += 1
+
+        show_message(
+            f"{job.replace('_', ' ').title()} reached Level {career['level']}!",
+            GREEN
+        )
+housing_options = {
+    "Shared Room": {
+        "price": 0,
+        "daily_cost": 0,
+        "energy_bonus": 0,
+        "health_bonus": 0
+    },
+    "Small Apartment": {
+        "price": 500,
+        "daily_cost": 10,
+        "energy_bonus": 1,
+        "health_bonus": 0
+    },
+    "Family House": {
+        "price": 2500,
+        "daily_cost": 25,
+        "energy_bonus": 2,
+        "health_bonus": 1
+    },
+    "Luxury House": {
+        "price": 10000,
+        "daily_cost": 50,
+        "energy_bonus": 3,
+        "health_bonus": 2
+    }
+}
+
+current_home = "Shared Room"
 
 
 seasons = ["Spring", "Summer", "Autumn", "Winter"]
@@ -127,20 +218,74 @@ def check_achievements():
 
 
 class Button:
+
     def __init__(self, x, y, w, h, text, color=GRAY, hover_color=(170, 170, 170)):
+
         self.rect = pygame.Rect(x, y, w, h)
         self.text = text
         self.color = color
         self.hover_color = hover_color
 
     def draw(self, win):
+
         mouse_pos = pygame.mouse.get_pos()
-        current_color = self.hover_color if self.rect.collidepoint(mouse_pos) else self.color
-        pygame.draw.rect(win, current_color, self.rect, border_radius=8)
-        txt = FONT.render(self.text, True, BLACK)
-        win.blit(txt, (self.rect.x + 10, self.rect.y + 10))
+        hovered = self.rect.collidepoint(mouse_pos)
+
+        # Choose button colour
+        if hovered:
+            current_color = self.hover_color
+        else:
+            current_color = self.color
+
+        # Shadow
+        shadow_rect = self.rect.copy()
+        shadow_rect.y += 4
+
+        pygame.draw.rect(
+            win,
+            (0, 0, 0),
+            shadow_rect,
+            border_radius=14
+        )
+
+        # Slight hover lift
+        button_rect = self.rect.copy()
+
+        if hovered:
+            button_rect.y -= 2
+
+        # Main button
+        pygame.draw.rect(
+            win,
+            current_color,
+            button_rect,
+            border_radius=14
+        )
+
+        # Subtle highlight border
+        pygame.draw.rect(
+            win,
+            (255, 255, 255),
+            button_rect,
+            width=2,
+            border_radius=14
+        )
+
+        # Button text
+        txt = FONT.render(
+            self.text,
+            True,
+            BLACK
+        )
+
+        txt_rect = txt.get_rect(
+            center=button_rect.center
+        )
+
+        win.blit(txt, txt_rect)
 
     def is_clicked(self, pos):
+
         return self.rect.collidepoint(pos)
 
 
@@ -160,7 +305,184 @@ def draw_message():
         msg_txt = FONT.render(message, True, msg_color)
         WIN.blit(msg_txt, (20, HEIGHT - 40))
         msg_timer -= 1
+event_popup = None
 
+
+def show_event_popup(title, description, effect, color=GREEN):
+    global event_popup
+
+    event_popup = {
+        "title": title,
+        "description": description,
+        "effect": effect,
+        "color": color
+    }
+
+    waiting = True
+
+    while waiting:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_RETURN or event.key == pygame.K_SPACE:
+                    waiting = False
+
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if 250 <= event.pos[0] <= 550 and 500 <= event.pos[1] <= 550:
+                    waiting = False
+
+        # Background
+        WIN.fill(bg_color)
+
+        # Dark overlay
+        overlay = pygame.Surface((WIDTH, HEIGHT))
+        overlay.set_alpha(120)
+        overlay.fill(BLACK)
+        WIN.blit(overlay, (0, 0))
+
+        # Day/night colours
+        if time_of_day == "Night":
+            card_color = (35, 35, 55)
+            text_color = WHITE
+            border_color = (90, 90, 130)
+            button_color = (70, 70, 130)
+        else:
+            card_color = WHITE
+            text_color = BLACK
+            border_color = DARK_BLUE
+            button_color = BLUE
+
+        # Event card
+        card = pygame.Rect(150, 100, 500, 400)
+
+        pygame.draw.rect(WIN, card_color, card, border_radius=20)
+        pygame.draw.rect(WIN, border_color, card, 4, border_radius=20)
+
+        # Title
+        title_text = BIG_FONT.render(title, True, text_color)
+        title_rect = title_text.get_rect(center=(WIDTH // 2, 160))
+        WIN.blit(title_text, title_rect)
+
+        # Description
+        description_text = FONT.render(description, True, text_color)
+        description_rect = description_text.get_rect(center=(WIDTH // 2, 250))
+        WIN.blit(description_text, description_rect)
+
+        # Effect
+        effect_text = BIG_FONT.render(effect, True, color)
+        effect_rect = effect_text.get_rect(center=(WIDTH // 2, 330))
+        WIN.blit(effect_text, effect_rect)
+
+        # Continue button
+        continue_rect = pygame.Rect(250, 500, 300, 50)
+        pygame.draw.rect(WIN, button_color, continue_rect, border_radius=12)
+
+        continue_text = FONT.render("Continue", True, WHITE)
+        continue_text_rect = continue_text.get_rect(center=continue_rect.center)
+        WIN.blit(continue_text, continue_text_rect)
+
+        pygame.display.update()
+        clock.tick(60)
+
+    event_popup = None
+def show_choice_event_popup(title, description, choices):
+    waiting = True
+    selected_choice = None
+
+    while waiting:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_1 and len(choices) >= 1:
+                    selected_choice = 0
+                    waiting = False
+
+                elif event.key == pygame.K_2 and len(choices) >= 2:
+                    selected_choice = 1
+                    waiting = False
+
+                elif event.key == pygame.K_3 and len(choices) >= 3:
+                    selected_choice = 2
+                    waiting = False
+
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                for i, choice in enumerate(choices):
+                    choice_rect = pygame.Rect(175, 390 + i * 60, 450, 50)
+
+                    if choice_rect.collidepoint(event.pos):
+                        selected_choice = i
+                        waiting = False
+
+        # Background
+        WIN.fill(bg_color)
+
+        # Dark overlay
+        overlay = pygame.Surface((WIDTH, HEIGHT))
+        overlay.set_alpha(120)
+        overlay.fill(BLACK)
+        WIN.blit(overlay, (0, 0))
+
+        # Day/night colours
+        if time_of_day == "Night":
+            card_color = (35, 35, 55)
+            text_color = WHITE
+            border_color = (90, 90, 130)
+            button_color = (70, 70, 130)
+        else:
+            card_color = WHITE
+            text_color = BLACK
+            border_color = DARK_BLUE
+            button_color = BLUE
+
+        # Event card
+        card = pygame.Rect(125, 70, 550, 500)
+
+        pygame.draw.rect(WIN, card_color, card, border_radius=20)
+        pygame.draw.rect(WIN, border_color, card, 4, border_radius=20)
+
+        # Title
+        title_text = BIG_FONT.render(title, True, text_color)
+        title_rect = title_text.get_rect(center=(WIDTH // 2, 125))
+        WIN.blit(title_text, title_rect)
+
+        # Description
+        description_text = FONT.render(description, True, text_color)
+        description_rect = description_text.get_rect(center=(WIDTH // 2, 210))
+        WIN.blit(description_text, description_rect)
+
+        # Choices
+        for i, choice in enumerate(choices):
+            choice_rect = pygame.Rect(175, 390 + i * 60, 450, 50)
+
+            pygame.draw.rect(
+                WIN,
+                button_color,
+                choice_rect,
+                border_radius=12
+            )
+
+            choice_text = FONT.render(
+                f"{i + 1}. {choice}",
+                True,
+                WHITE
+            )
+
+            choice_text_rect = choice_text.get_rect(
+                center=choice_rect.center
+            )
+
+            WIN.blit(choice_text, choice_text_rect)
+
+        pygame.display.update()
+        clock.tick(60)
+
+    return selected_choice
 
 def draw_stat_bar(x, y, w, h, value, max_value, color, label):
     pygame.draw.rect(WIN, BLACK, (x - 2, y - 2, w + 4, h + 4))
@@ -189,25 +511,335 @@ def update_background(target):
 
 def random_event():
     global Balance, hunger, energy, health
-    chance = random.randint(1, 10)
-    if chance == 1:
-        Balance += 20
-        show_message("Lucky day! You found £20!")
-    elif chance == 2:
-        Balance = max(0, Balance - 15)
-        show_message("Oh no! You got pickpocketed!", RED)
-    elif chance == 3:
-        health -= 2
-        show_message("You caught a cold! Health -2", RED)
-    elif chance == 4:
-        energy -= 2
-        show_message("You slipped while working! Energy -2", RED)
-    elif chance == 5:
-        hunger += 5
-        show_message("Your friend gifted you lunch!")
-        if hunger > 10:
-            hunger = 10
 
+    # 50% chance that nothing happens
+    if random.randint(1, 2) == 1:
+        return
+
+    event = random.randint(1,12)
+
+    if event == 1:
+        choice = show_choice_event_popup(
+            "You Found Some Money",
+            "You spot £20 lying on the ground with nobody around.",
+            [
+                "Keep it",
+                "Look for the owner",
+                "Leave it"
+            ]
+        )
+
+        if choice == 0:
+            Balance += 20
+            show_message("You kept the money! +£20")
+
+        elif choice == 1:
+            Balance += 10
+            health = min(10, health + 1)
+            show_message("You found the owner! +£10, Health +1")
+
+        elif choice == 2:
+            show_message("You left the money where it was.")
+
+    elif event == 2:
+        choice = show_choice_event_popup(
+            "You Lost Your Money",
+            "You realise that £15 has gone missing.",
+            [
+                "Search for it",
+                "Forget about it",
+                "Ask someone for help"
+            ]
+        )
+
+        if choice == 0:
+            Balance = max(0, Balance - 5)
+            energy = max(0, energy - 1)
+            show_message("You found most of it! -£5, Energy -1")
+
+        elif choice == 1:
+            Balance = max(0, Balance - 15)
+            show_message("You gave up looking. -£15")
+
+        elif choice == 2:
+            Balance = max(0, Balance - 10)
+            show_message("Someone helped you find some of it! -£10")
+
+    elif event == 3:
+        choice = show_choice_event_popup(
+            "You Caught a Cold",
+            "You're feeling ill and need to decide what to do.",
+            [
+                "Rest at home",
+                "Push through it",
+                "Buy medicine"
+            ]
+        )
+
+        if choice == 0:
+            energy = min(10, energy + 2)
+            health = max(0, health - 1)
+            show_message("You rested. Energy +2, Health -1")
+
+        elif choice == 1:
+            health = max(0, health - 3)
+            show_message("You pushed through it. Health -3")
+
+        elif choice == 2:
+            if Balance >= 15:
+                Balance -= 15
+                health = min(10, health + 2)
+                show_message("You bought medicine. -£15, Health +2")
+            else:
+                show_message("You couldn't afford the medicine!", RED)
+
+    elif event == 4:
+        choice = show_choice_event_popup(
+            "Exhausting Day",
+            "You're completely worn out after a long day.",
+            [
+                "Go straight home",
+                "Buy an energy drink",
+                "Keep working"
+            ]
+        )
+
+        if choice == 0:
+            energy = min(10, energy + 2)
+            show_message("You went home and rested. Energy +2")
+
+        elif choice == 1:
+            if Balance >= 15:
+                Balance -= 15
+                energy = min(10, energy + 4)
+                show_message("You bought an energy drink. -£15, Energy +4")
+            else:
+                show_message("You couldn't afford an energy drink!", RED)
+
+        elif choice == 2:
+            energy = max(0, energy - 2)
+            health = max(0, health - 1)
+            show_message("You kept working. Energy -2, Health -1")
+
+    elif event == 5:
+        choice = show_choice_event_popup(
+            "Free Food!",
+            "Your friend offers you some food they don't need.",
+            [
+                "Accept the food",
+                "Save it for later",
+                "Decline politely"
+            ]
+        )
+
+        if choice == 0:
+            hunger = min(10, hunger + 5)
+            show_message("You ate the food! Hunger +5")
+
+        elif choice == 1:
+            hunger = min(10, hunger + 2)
+            show_message("You saved some for later. Hunger +2")
+
+        elif choice == 2:
+            show_message("You politely declined the food.")
+
+    elif event == 6:
+        choice = show_choice_event_popup(
+            "A Good Deed",
+            "Someone nearby needs help carrying some heavy boxes.",
+            [
+                "Help them",
+                "Ignore them",
+                "Ask for a reward"
+            ]
+        )
+
+        if choice == 0:
+            Balance += 35
+            energy = max(0, energy - 1)
+            show_message("You helped them! +£35, Energy -1")
+
+        elif choice == 1:
+            show_message("You decided not to get involved.")
+
+        elif choice == 2:
+            Balance += 50
+            energy = max(0, energy - 2)
+            show_message("They agreed! +£50, Energy -2")
+
+    elif event == 7:
+        choice = show_choice_event_popup(
+            "Unexpected Expense",
+            "Something you own suddenly needs repairing.",
+            [
+                "Pay for the repair",
+                "Try to fix it yourself",
+                "Ignore the problem"
+            ]
+        )
+
+        if choice == 0:
+            if Balance >= 25:
+                Balance -= 25
+                health = min(10, health + 1)
+                show_message("You paid for the repair. -£25, Health +1")
+
+            else:
+                show_message("You couldn't afford the repair!", RED)
+
+        elif choice == 1:
+            energy = max(0, energy - 2)
+
+            if random.randint(1, 2) == 1:
+                Balance -= 5
+                show_message("You fixed it yourself! Energy -2, -£5")
+
+            else:
+                health = max(0, health - 1)
+                show_message("The repair went badly. Energy -2, Health -1", RED)
+
+        elif choice == 2:
+            health = max(0, health - 2)
+            show_message("You ignored the problem. Health -2", RED)
+
+    elif event == 8:
+        choice = show_choice_event_popup(
+            "A Great Night's Sleep",
+            "You wake up feeling unusually well-rested.",
+            [
+                "Get up early",
+                "Sleep a little longer",
+                "Stay in bed all day"
+            ]
+        )
+
+        if choice == 0:
+            energy = min(10, energy + 2)
+            Balance += 10
+            show_message("You got up early and were productive! Energy +2, +£10")
+
+        elif choice == 1:
+            energy = min(10, energy + 4)
+            show_message("You slept a little longer. Energy +4")
+
+        elif choice == 2:
+            energy = 10
+            hunger = max(0, hunger - 2)
+            show_message("You stayed in bed all day. Energy +5, Hunger -2")
+
+    elif event == 9:
+        choice = show_choice_event_popup(
+            "Time to Recover",
+            "You've been feeling worn down and need to take care of yourself.",
+            [
+                "Take a full rest",
+                "Take a short break",
+                "Keep going"
+            ]
+        )
+
+        if choice == 0:
+            health = min(10, health + 3)
+            energy = min(10, energy + 2)
+            show_message("You had a proper rest. Health +3, Energy +2")
+
+        elif choice == 1:
+            health = min(10, health + 2)
+            energy = min(10, energy + 1)
+            show_message("You took a short break. Health +2, Energy +1")
+
+        elif choice == 2:
+            health = max(0, health - 1)
+            energy = max(0, energy - 2)
+            show_message("You kept going. Health -1, Energy -2", RED)
+
+    elif event == 10:
+        choice = show_choice_event_popup(
+            "You Forgot to Eat",
+            "You suddenly realise you haven't eaten much today.",
+            [
+                "Cook something at home",
+                "Buy a meal",
+                "Keep going without eating"
+            ]
+        )
+
+        if choice == 0:
+            hunger = min(10, hunger + 5)
+            energy = max(0, energy - 1)
+            show_message("You cooked a meal. Hunger +5, Energy -1")
+
+        elif choice == 1:
+            if Balance >= 20:
+                Balance -= 20
+                hunger = min(10, hunger + 7)
+                show_message("You bought a good meal. -£20, Hunger +7")
+            else:
+                show_message("You couldn't afford the meal!", RED)
+
+        elif choice == 2:
+            hunger = max(0, hunger - 3)
+            energy = max(0, energy - 2)
+            show_message("You kept going without eating. Hunger -3, Energy -2", RED)
+
+    elif event == 11:
+        choice = show_choice_event_popup(
+            "Someone Owes You Money",
+            "A friend remembers they borrowed money from you a while ago.",
+            [
+                "Take the full amount",
+                "Take half",
+                "Let them keep it"
+            ]
+        )
+
+        if choice == 0:
+            Balance += 50
+            show_message("You got your money back! +£50")
+
+        elif choice == 1:
+            Balance += 25
+            health = min(10, health + 1)
+            show_message("You took half and let them keep the rest. +£25, Health +1")
+
+        elif choice == 2:
+            health = min(10, health + 2)
+            show_message("You let them keep the money. Health +2")
+
+    elif event == 12:
+        choice = show_choice_event_popup(
+            "Something Broke!",
+            "Something important you own suddenly stops working.",
+            [
+                "Pay for a repair",
+                "Try to fix it yourself",
+                "Leave it broken"
+            ]
+        )
+
+        if choice == 0:
+            if Balance >= 40:
+                Balance -= 40
+                health = min(10, health + 1)
+                show_message("You paid for the repair. -£40, Health +1")
+
+            else:
+                show_message("You couldn't afford the repair!", RED)
+
+        elif choice == 1:
+            energy = max(0, energy - 2)
+
+            if random.randint(1, 2) == 1:
+                Balance -= 10
+                show_message("You fixed it yourself! Energy -2, -£10")
+
+            else:
+                health = max(0, health - 2)
+                show_message("The repair failed! Energy -2, Health -2", RED)
+
+        elif choice == 2:
+            health = max(0, health - 2)
+            show_message("You left it broken. Health -2", RED)
 def exhaustion_penalty():
     global health
     if hunger <= 0:
@@ -219,22 +851,291 @@ def exhaustion_penalty():
 
 
 def show_status():
-    draw_stat_bar(20, 20, 200, 25, health, 10, RED, "Health")
-    draw_stat_bar(20, 60, 200, 25, hunger, 10, ORANGE, "Hunger")
-    draw_stat_bar(20, 100, 200, 25, energy, 10, GREEN, "Energy")
-    WIN.blit(FONT.render(f"Balance: £{Balance}", True, BLUE), (20, 140))
-    WIN.blit(FONT.render(f"Day: {day} ({time_of_day})", True, BLACK), (20, 180))
-    WIN.blit(FONT.render(f"Season: {get_current_season()}", True, BLACK), (20, 220))
+
+    # Main status panel
+    if time_of_day == "Day":
+        panel_color = (248, 249, 252)
+        border_color = (220, 222, 230)
+        card_color = (238, 240, 245)
+        text_color = BLACK
+        muted_color = (100, 105, 115)
+        bar_background = (215, 218, 225)
+    else:
+        panel_color = (30, 30, 48)
+        border_color = (70, 70, 95)
+        card_color = (42, 42, 65)
+        text_color = WHITE
+        muted_color = (170, 170, 190)
+        bar_background = (65, 65, 90)
+
+    # Main panel
+    pygame.draw.rect(
+        WIN,
+        panel_color,
+        (30, 25, 500, 540),
+        border_radius=20
+    )
+
+    pygame.draw.rect(
+        WIN,
+        border_color,
+        (30, 25, 500, 540),
+        2,
+        border_radius=20
+    )
+
+    # Title
+    title = BIG_FONT.render(
+        "Your Life",
+        True,
+        text_color
+    )
+
+    WIN.blit(
+        title,
+        (55, 45)
+    )
+
+    # Day / Night badge
+    time_color = (230, 170, 30) if time_of_day == "Day" else (100, 120, 210)
+
+    time_badge = pygame.Rect(
+        380,
+        43,
+        110,
+        42
+    )
+
+    pygame.draw.rect(
+        WIN,
+        card_color,
+        time_badge,
+        border_radius=12
+    )
+
+    pygame.draw.rect(
+        WIN,
+        time_color,
+        time_badge,
+        2,
+        border_radius=12
+    )
+
+    time_text = FONT.render(
+        "DAY" if time_of_day == "Day" else "NIGHT",
+        True,
+        time_color
+    )
+
+    time_rect = time_text.get_rect(
+        center=time_badge.center
+    )
+
+    WIN.blit(
+        time_text,
+        time_rect
+    )
+
+    # Stat cards
+    stats = [
+        ("Health", health, RED),
+        ("Hunger", hunger, ORANGE),
+        ("Energy", energy, BLUE)
+    ]
+
+    y = 105
+
+    for name, value, color in stats:
+
+        value = max(0, min(10, value))
+
+        # Card
+        card = pygame.Rect(
+            55,
+            y,
+            420,
+            75
+        )
+
+        pygame.draw.rect(
+            WIN,
+            card_color,
+            card,
+            border_radius=14
+        )
+
+        # Label
+        label = FONT.render(
+            name,
+            True,
+            text_color
+        )
+
+        WIN.blit(
+            label,
+            (75, y + 10)
+        )
+
+        # Value
+        value_text = FONT.render(
+            f"{value}/10",
+            True,
+            muted_color
+        )
+
+        value_rect = value_text.get_rect(
+            midright=(455, y + 24)
+        )
+
+        WIN.blit(
+            value_text,
+            value_rect
+        )
+
+        # Progress bar background
+        bar_rect = pygame.Rect(
+            75,
+            y + 45,
+            380,
+            14
+        )
+
+        pygame.draw.rect(
+            WIN,
+            bar_background,
+            bar_rect,
+            border_radius=7
+        )
+
+        # Progress bar
+        fill_width = int(
+            380 * value / 10
+        )
+
+        if fill_width > 0:
+
+            fill_rect = pygame.Rect(
+                75,
+                y + 45,
+                fill_width,
+                14
+            )
+
+            pygame.draw.rect(
+                WIN,
+                color,
+                fill_rect,
+                border_radius=7
+            )
+
+        y += 88
+
+    # Divider
+    pygame.draw.line(
+        WIN,
+        border_color,
+        (55, 380),
+        (475, 380),
+        2
+    )
+
+    # Balance card
+    balance_card = pygame.Rect(
+        55,
+        400,
+        420,
+        65
+    )
+
+    pygame.draw.rect(
+        WIN,
+        card_color,
+        balance_card,
+        border_radius=14
+    )
+
+    balance_label = FONT.render(
+        "Balance",
+        True,
+        muted_color
+    )
+
+    WIN.blit(
+        balance_label,
+        (75, 410)
+    )
+
+    balance_text = BIG_FONT.render(
+        f"£{Balance}",
+        True,
+        GREEN
+    )
+
+    balance_rect = balance_text.get_rect(
+        midright=(455, 435)
+    )
+
+    WIN.blit(
+        balance_text,
+        balance_rect
+    )
+
+    # Day / Season card
+    info_card = pygame.Rect(
+        55,
+        475,
+        420,
+        65
+    )
+
+    pygame.draw.rect(
+        WIN,
+        card_color,
+        info_card,
+        border_radius=14
+    )
+
+    day_text = FONT.render(
+        f"Day {day}",
+        True,
+        text_color
+    )
+
+    season_text = FONT.render(
+        get_current_season(),
+        True,
+        muted_color
+    )
+
+    WIN.blit(
+        day_text,
+        (75, 493)
+    )
+
+    season_rect = season_text.get_rect(
+        midright=(455, 507)
+    )
+
+    WIN.blit(
+        season_text,
+        season_rect
+    )   
 
 
-shop_btn = Button(600, 50, 150, 50, "Shop", color=ORANGE)
-work_btn = Button(600, 120, 150, 50, "Work", color=BLUE)
-day_btn = Button(600, 190, 150, 50, "Day", color=YELLOW)
-night_btn = Button(600, 260, 150, 50, "Night", color=DARK_BLUE)
-save_btn = Button(600, 330, 150, 50, "Save", color=GREEN)
-load_btn = Button(600, 400, 150, 50, "Load", color=GREEN)
-inv_btn = Button(600, 470, 150, 50, "Inventory", color=(0, 200, 0))
-ach_btn = Button(600, 540, 150, 50, "Achievements", color=(255, 165, 0))
+shop_btn = Button(590, 50, 170, 50, "Shop", color=ORANGE)
+work_btn = Button(590, 120, 170, 50, "Work", color=BLUE)
+
+day_btn = Button(590, 190, 80, 50, "Day", color=YELLOW)
+night_btn = Button(680, 190, 80, 50, "Night", color=DARK_BLUE)
+
+save_btn = Button(590, 260, 80, 50, "Save", color=GREEN)
+load_btn = Button(680, 260, 80, 50, "Load", color=GREEN)
+
+inv_btn = Button(590, 330, 170, 50, "Inventory", color=(0, 200, 0))
+ach_btn = Button(590, 400, 170, 50, "Achievements", color=(255, 165, 0))
+housing_btn = Button(590, 465, 170, 50, "Housing", color=(120, 80, 200))
+
+career_btn = Button(590, 530, 170, 50, "Careers", color=(60, 150, 220))
 
 
 def clamp_price(p):
@@ -505,8 +1406,497 @@ def achievements_screen():
         for event in pygame.event.get():
             if event.type == pygame.QUIT: pygame.quit(); sys.exit()
             if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE: choosing = False
+def housing_screen():
 
+    global current_home, Balance
 
+    running = True
+
+    while running:
+
+        target_color = day_color if time_of_day == "Day" else night_color
+        update_background(target_color)
+        WIN.fill(bg_color)
+
+        # Colours
+        if time_of_day == "Night":
+            panel_color = (35, 35, 55)
+            text_color = WHITE
+            border_color = (90, 90, 130)
+            card_color = (45, 45, 70)
+        else:
+            panel_color = WHITE
+            text_color = BLACK
+            border_color = DARK_BLUE
+            card_color = (235, 240, 250)
+
+        # Main panel
+        panel = pygame.Rect(
+            80,
+            50,
+            640,
+            500
+        )
+
+        pygame.draw.rect(
+            WIN,
+            panel_color,
+            panel,
+            border_radius=20
+        )
+
+        pygame.draw.rect(
+            WIN,
+            border_color,
+            panel,
+            4,
+            border_radius=20
+        )
+
+        # Title
+        title = BIG_FONT.render(
+            "Housing",
+            True,
+            text_color
+        )
+
+        title_rect = title.get_rect(
+            center=(WIDTH // 2, 85)
+        )
+
+        WIN.blit(
+            title,
+            title_rect
+        )
+
+        # Current home
+        current_text = FONT.render(
+            f"Current Home: {current_home}",
+            True,
+            text_color
+        )
+
+        current_rect = current_text.get_rect(
+            center=(WIDTH // 2, 125)
+        )
+
+        WIN.blit(
+            current_text,
+            current_rect
+        )
+
+        # Housing options
+        y = 160
+
+        for home_name, data in housing_options.items():
+
+            is_current = home_name == current_home
+
+            if is_current:
+                option_color = (210, 235, 220)
+                option_border = GREEN
+            else:
+                option_color = card_color
+                option_border = border_color
+
+            option_rect = pygame.Rect(
+                110,
+                y,
+                580,
+                70
+            )
+
+            pygame.draw.rect(
+                WIN,
+                option_color,
+                option_rect,
+                border_radius=12
+            )
+
+            pygame.draw.rect(
+                WIN,
+                option_border,
+                option_rect,
+                2,
+                border_radius=12
+            )
+
+            # Home name
+            name_text = FONT.render(
+                home_name,
+                True,
+                text_color
+            )
+
+            WIN.blit(
+                name_text,
+                (130, y + 8)
+            )
+
+            # Price
+            if data["price"] == 0:
+                price_text = "Free"
+            else:
+                price_text = f"£{data['price']}"
+
+            price_render = FONT.render(
+                price_text,
+                True,
+                text_color
+            )
+
+            WIN.blit(
+                price_render,
+                (130, y + 38)
+            )
+
+            # Daily cost
+            cost_text = FONT.render(
+                f"Daily: £{data['daily_cost']}",
+                True,
+                text_color
+            )
+
+            WIN.blit(
+                cost_text,
+                (300, y + 38)
+            )
+
+            # Bonuses
+            bonus_text = FONT.render(
+                f"Energy +{data['energy_bonus']}  Health +{data['health_bonus']}",
+                True,
+                text_color
+            )
+
+            WIN.blit(
+                bonus_text,
+                (470, y + 38)
+            )
+
+            y += 78
+
+        # Instructions
+        instruction = FONT.render(
+            "Click a home to buy/move    |    ESC to return",
+            True,
+            text_color
+        )
+
+        instruction_rect = instruction.get_rect(
+            center=(WIDTH // 2, 525)
+        )
+
+        WIN.blit(
+            instruction,
+            instruction_rect
+        )
+
+        pygame.display.update()
+
+        for event in pygame.event.get():
+
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+
+            if event.type == pygame.KEYDOWN:
+
+                if event.key == pygame.K_ESCAPE:
+                    running = False
+
+            if event.type == pygame.MOUSEBUTTONDOWN:
+
+                mouse_pos = event.pos
+
+                y = 160
+
+                for home_name, data in housing_options.items():
+
+                    option_rect = pygame.Rect(
+                        110,
+                        y,
+                        580,
+                        70
+                    )
+
+                    if option_rect.collidepoint(mouse_pos):
+
+                        if home_name == current_home:
+
+                            show_message(
+                                "You already live here!",
+                                ORANGE
+                            )
+
+                        elif Balance >= data["price"]:
+
+                            Balance -= data["price"]
+                            current_home = home_name
+
+                            show_message(
+                                f"Moved into {home_name}!",
+                                GREEN
+                            )
+
+                        else:
+
+                            show_message(
+                                "Not enough money!",
+                                RED
+                            )
+
+                    y += 78
+
+        clock.tick(60)
+def career_screen():
+    running = True
+
+    scroll_offset = 0
+    max_scroll = 0
+
+    while running:
+        target_color = day_color if time_of_day == "Day" else night_color
+        update_background(target_color)
+        WIN.fill(bg_color)
+
+        if time_of_day == "Night":
+            panel_color = (35, 35, 55)
+            text_color = WHITE
+            border_color = (90, 90, 130)
+            card_color = (45, 45, 70)
+        else:
+            panel_color = WHITE
+            text_color = BLACK
+            border_color = DARK_BLUE
+            card_color = (235, 240, 250)
+
+        # Main panel
+        panel = pygame.Rect(45, 20, 710, 560)
+
+        pygame.draw.rect(
+            WIN,
+            panel_color,
+            panel,
+            border_radius=20
+        )
+
+        pygame.draw.rect(
+            WIN,
+            border_color,
+            panel,
+            4,
+            border_radius=20
+        )
+
+        # Title
+        title = BIG_FONT.render(
+            "Careers",
+            True,
+            text_color
+        )
+
+        title_rect = title.get_rect(
+            center=(WIDTH // 2, 55)
+        )
+
+        WIN.blit(title, title_rect)
+
+        # Area where careers can be displayed
+        list_area = pygame.Rect(
+            65,
+            85,
+            670,
+            445
+        )
+
+        # Calculate total scrolling amount
+        card_height = 48
+        card_spacing = 52
+
+        total_height = len(career_data) * card_spacing
+
+        max_scroll = max(
+            0,
+            total_height - list_area.height
+        )
+
+        scroll_offset = max(
+            0,
+            min(scroll_offset, max_scroll)
+        )
+
+        # Clip drawing to the career list area
+        WIN.set_clip(list_area)
+
+        y = list_area.y - scroll_offset
+
+        for job_name, data in career_data.items():
+
+            level = data["level"]
+            xp = data["xp"]
+            xp_required = career_xp_required(level)
+
+            career_title = get_career_title(level)
+            pay_bonus = get_career_pay_bonus(level)
+
+            card = pygame.Rect(
+                75,
+                y,
+                650,
+                card_height
+            )
+
+            pygame.draw.rect(
+                WIN,
+                card_color,
+                card,
+                border_radius=10
+            )
+
+            pygame.draw.rect(
+                WIN,
+                border_color,
+                card,
+                2,
+                border_radius=10
+            )
+
+            job_text = FONT.render(
+                job_name.replace("_", " ").title(),
+                True,
+                text_color
+            )
+
+            title_text = FONT.render(
+                career_title,
+                True,
+                text_color
+            )
+
+            level_text = FONT.render(
+                f"Level {level}",
+                True,
+                text_color
+            )
+
+            xp_text = FONT.render(
+                f"{xp} / {xp_required} XP",
+                True,
+                text_color
+            )
+
+            pay_text = FONT.render(
+                f"+{pay_bonus}% pay",
+                True,
+                GREEN
+            )
+
+            WIN.blit(job_text, (90, y + 10))
+            WIN.blit(title_text, (250, y + 10))
+            WIN.blit(level_text, (390, y + 10))
+            WIN.blit(xp_text, (490, y + 10))
+            WIN.blit(pay_text, (600, y + 10))
+
+            y += card_spacing
+
+        # Stop career cards drawing outside the list area
+        WIN.set_clip(None)
+
+        # Scroll indicator
+        if max_scroll > 0:
+
+            scrollbar_area = pygame.Rect(
+                720,
+                90,
+                8,
+                435
+            )
+
+            pygame.draw.rect(
+                WIN,
+                border_color,
+                scrollbar_area,
+                border_radius=4
+            )
+
+            scrollbar_height = max(
+                40,
+                int(
+                    scrollbar_area.height
+                    * (list_area.height / total_height)
+                )
+            )
+
+            scrollbar_y = (
+                scrollbar_area.y
+                + int(
+                    (scroll_offset / max_scroll)
+                    * (scrollbar_area.height - scrollbar_height)
+                )
+            )
+
+            scrollbar = pygame.Rect(
+                720,
+                scrollbar_y,
+                8,
+                scrollbar_height
+            )
+
+            pygame.draw.rect(
+                WIN,
+                BLUE,
+                scrollbar,
+                border_radius=4
+            )
+
+        # Bottom instruction
+        close_text = FONT.render(
+            "↑ ↓ Scroll    |    ESC to return",
+            True,
+            text_color
+        )
+
+        close_rect = close_text.get_rect(
+            center=(WIDTH // 2, 555)
+        )
+
+        WIN.blit(close_text, close_rect)
+
+        pygame.display.update()
+
+        for event in pygame.event.get():
+
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+
+            if event.type == pygame.KEYDOWN:
+
+                if event.key == pygame.K_ESCAPE:
+                    running = False
+
+                elif event.key == pygame.K_DOWN:
+                    scroll_offset += 52
+
+                elif event.key == pygame.K_UP:
+                    scroll_offset -= 52
+
+                scroll_offset = max(
+                    0,
+                    min(scroll_offset, max_scroll)
+                )
+
+            if event.type == pygame.MOUSEWHEEL:
+
+                scroll_offset -= event.y * 52
+
+                scroll_offset = max(
+                    0,
+                    min(scroll_offset, max_scroll)
+                )
+
+        clock.tick(60)
 def cashier_minigame():
     price = random.randint(5, 20)
     payment = random.choice([20, 50])
@@ -1300,7 +2690,8 @@ def rhythm_minigame():
 
 
 def go_to_work():
-    global Balance, hunger, energy, day
+    
+    global Balance, hunger, energy, health, day
     choosing = True
 
     cashier_btn = Button(120, 220, 150, 60, "Cashier", color=GRAY)
@@ -1318,6 +2709,8 @@ def go_to_work():
 
 
     chosen_income = 0
+    chosen_job = None   
+    
     while choosing:
         target_color = day_color if time_of_day == "Day" else night_color
         update_background(target_color)
@@ -1342,41 +2735,71 @@ def go_to_work():
                 choosing = False
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if cashier_btn.is_clicked(event.pos):
+                    chosen_job = "cashier"
                     chosen_income = cashier_minigame()
                     choosing = False
                 elif programmer_btn.is_clicked(event.pos):
+                    chosen_job = "programmer"
                     chosen_income = programmer_minigame()
                     choosing = False
                 elif gambler_btn.is_clicked(event.pos):
+                    chosen_job = "gambler"
                     chosen_income = gambler_minigame()
                     choosing = False
                 elif chef_btn.is_clicked(event.pos):
+                    chosen_job = "chef"
                     chosen_income = chef_minigame()
                     choosing = False
                 elif delivery_btn.is_clicked(event.pos):
+                    chosen_job = "delivery"
                     chosen_income = delivery_minigame()
                     choosing = False
                 elif streamer_btn.is_clicked(event.pos):
+                    chosen_job = "streamer"
                     chosen_income = streamer_minigame()
                     choosing = False
                 elif gd_runner_btn.is_clicked(event.pos):
+                    chosen_job = "gd_runner"
                     chosen_income = gd_runner_minigame()
                     choosing = False
-                elif fishing_btn.is_clicked(event.pos):
+                elif fishing_btn.is_clicked(event.pos): 
+                    chosen_job = "fishing"
                     chosen_income = fishing_minigame()
                     choosing = False
                 elif rhythm_btn.is_clicked(event.pos):
+                    chosen_job = "rhythm"
                     chosen_income = rhythm_minigame()
                     choosing = False
         
   
+    career_level = career_data[chosen_job]["level"]
+    pay_bonus = get_career_pay_bonus(career_level)
+
+    if chosen_income > 0:
+        chosen_income = int(chosen_income * (1 + pay_bonus / 100))
+
     Balance += chosen_income
     hunger -= 2
     energy -= 2
+    job_xp = 50
+    career_data[chosen_job]["xp"] += job_xp
+
+    check_career_level_up(chosen_job)
     random_event()
+
     day += 1
+
+    housing_cost = housing_options[current_home]["daily_cost"]
+    Balance = max(0, Balance - housing_cost)
+
+    energy_bonus = housing_options[current_home]["energy_bonus"]
+    health_bonus = housing_options[current_home]["health_bonus"]
+
+    energy = min(10, energy + energy_bonus)
+    health = min(10, health + health_bonus)
+
     update_season()
-    update_daily_prices()  # new: prices change once per day
+    update_daily_prices()
     exhaustion_penalty()
     check_achievements()
 
@@ -1392,11 +2815,13 @@ def save_game():
             "time_of_day": time_of_day,
             "inventory_foods": inventory_foods,
             "inventory_energy": inventory_energy,
+            "current_home": current_home,
+            "career_data": career_data
         }, f)
     show_message("Game saved!")
 
 def load_game():
-    global Balance, hunger, energy, health, day, time_of_day, inventory_foods, inventory_energy
+    global Balance, hunger, energy, health, day, time_of_day, inventory_foods, inventory_energy, current_home, career_data
     try:
         with open("save.json") as f:
             data = json.load(f)
@@ -1406,6 +2831,8 @@ def load_game():
         health = data["health"]
         day = data["day"]
         time_of_day = data["time_of_day"]
+        current_home = data.get("current_home", "Shared Room")
+        career_data = data.get("career_data", career_data)
         inventory_foods = data.get("inventory_foods", inventory_foods)
         inventory_energy = data.get("inventory_energy", inventory_energy)
         update_season()
@@ -1455,8 +2882,29 @@ while running:
     WIN.fill(bg_color)
     show_status()
     draw_message()
+    # Right-side control panel
+    if time_of_day == "Day":
+        control_panel_color = (248, 249, 252)
+        control_border_color = (220, 222, 230)
+    else:
+        control_panel_color = (30, 30, 48)
+        control_border_color = (70, 70, 95)
 
-    for btn in [shop_btn, work_btn, day_btn, night_btn, save_btn, load_btn, inv_btn, ach_btn]:
+    pygame.draw.rect(
+        WIN,
+        control_panel_color,
+        (550, 15, 235, 570),
+        border_radius=20
+    )
+
+    pygame.draw.rect(
+        WIN,
+        control_border_color,
+        (550, 15, 235, 570),
+        2,
+        border_radius=20
+    )
+    for btn in [shop_btn, work_btn, day_btn, night_btn, save_btn, load_btn, inv_btn, ach_btn, housing_btn, career_btn]:
         btn.draw(WIN)
 
     pygame.display.update()
@@ -1481,6 +2929,10 @@ while running:
                 inventory_screen()
             elif ach_btn.is_clicked(event.pos):
                 achievements_screen()
+            elif housing_btn.is_clicked(event.pos):
+                housing_screen()
+            elif career_btn.is_clicked(event.pos):
+                career_screen()
 
     if health <= 0:
         WIN.fill(BLACK)
