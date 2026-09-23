@@ -1122,20 +1122,20 @@ def show_status():
     )   
 
 
-shop_btn = Button(590, 50, 170, 50, "Shop", color=ORANGE)
-work_btn = Button(590, 120, 170, 50, "Work", color=BLUE)
+shop_btn = Button(590, 55, 170, 45, "Shop", color=ORANGE)
+work_btn = Button(590, 115, 170, 45, "Work", color=BLUE)
 
-day_btn = Button(590, 190, 80, 50, "Day", color=YELLOW)
-night_btn = Button(680, 190, 80, 50, "Night", color=DARK_BLUE)
+day_btn = Button(590, 190, 80, 45, "Day", color=YELLOW)
+night_btn = Button(680, 190, 80, 45, "Night", color=DARK_BLUE)
 
-save_btn = Button(590, 260, 80, 50, "Save", color=GREEN)
-load_btn = Button(680, 260, 80, 50, "Load", color=GREEN)
+save_btn = Button(590, 270, 80, 45, "Save", color=GREEN)
+load_btn = Button(680, 270, 80, 45, "Load", color=GREEN)
 
-inv_btn = Button(590, 330, 170, 50, "Inventory", color=(0, 200, 0))
-ach_btn = Button(590, 400, 170, 50, "Achievements", color=(255, 165, 0))
-housing_btn = Button(590, 465, 170, 50, "Housing", color=(120, 80, 200))
+inv_btn = Button(590, 330, 170, 45, "Inventory", color=(0, 200, 0))
+ach_btn = Button(590, 390, 170, 45, "Achievements", color=(255, 165, 0))
 
-career_btn = Button(590, 530, 170, 50, "Careers", color=(60, 150, 220))
+housing_btn = Button(590, 450, 170, 45, "Housing", color=(120, 80, 200))
+career_btn = Button(590, 510, 170, 45, "Careers", color=(60, 150, 220))
 
 
 def clamp_price(p):
@@ -2903,6 +2903,23 @@ while running:
         (550, 15, 235, 570),
         2,
         border_radius=20
+    )
+    # Panel section labels
+    section_color = (120, 125, 135) if time_of_day == "Day" else (150, 150, 170)
+
+    WIN.blit(
+        FONT.render("ACTIONS", True, section_color),
+        (565, 30)
+    )
+
+    WIN.blit(
+        FONT.render("TIME", True, section_color),
+        (565, 165)
+    )
+
+    WIN.blit(
+        FONT.render("GAME", True, section_color),
+        (565, 245)
     )
     for btn in [shop_btn, work_btn, day_btn, night_btn, save_btn, load_btn, inv_btn, ach_btn, housing_btn, career_btn]:
         btn.draw(WIN)
