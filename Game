@@ -3943,24 +3943,136 @@ def toggle_time(new_time):
 
 
 def start_menu():
+
     menu_running = True
-    start_btn = Button(300, 250, 200, 60, "Start Game", color=GREEN)
-    quit_btn = Button(300, 350, 200, 60, "Quit", color=RED)
+
+    start_btn = Button(
+        300, 250, 200, 60,
+        "Start Game",
+        color=(107, 111, 138),
+        hover_color=(133, 137, 163)
+    )
+
+    quit_btn = Button(
+        300, 330, 200, 60,
+        "Quit",
+        color=(150, 80, 90),
+        hover_color=(175, 100, 110)
+    )
 
     while menu_running:
-        WIN.fill(day_color)
-        WIN.blit(BIG_FONT.render("Life Simulator 2D", True, BLACK), (220, 100))
+
+        # Background
+        target_color = day_color
+        update_background(target_color)
+        WIN.fill(bg_color)
+
+        # Main panel
+        pygame.draw.rect(
+            WIN,
+            (248, 249, 252),
+            (150, 70, 500, 460),
+            border_radius=24
+        )
+
+        pygame.draw.rect(
+            WIN,
+            (220, 222, 230),
+            (150, 70, 500, 460),
+            2,
+            border_radius=24
+        )
+
+        # Title
+        title = BIG_FONT.render(
+            "Life Simulator 2D",
+            True,
+            BLACK
+        )
+
+        title_rect = title.get_rect(
+            center=(WIDTH // 2, 135)
+        )
+
+        WIN.blit(
+            title,
+            title_rect
+        )
+
+        # Subtitle
+        subtitle = FONT.render(
+            "Build your life. Make your choices.",
+            True,
+            (100, 105, 115)
+        )
+
+        subtitle_rect = subtitle.get_rect(
+            center=(WIDTH // 2, 180)
+        )
+
+        WIN.blit(
+            subtitle,
+            subtitle_rect
+        )
+
+        # Version
+        version = FONT.render(
+            "Life Simulator 2.0",
+            True,
+            (120, 125, 135)
+        )
+
+        version_rect = version.get_rect(
+            center=(WIDTH // 2, 215)
+        )
+
+        WIN.blit(
+            version,
+            version_rect
+        )
+
+        # Buttons
         start_btn.draw(WIN)
         quit_btn.draw(WIN)
+
+        # Footer
+        footer = FONT.render(
+            "A 2D life simulation experience",
+            True,
+            (120, 125, 135)
+        )
+
+        footer_rect = footer.get_rect(
+            center=(WIDTH // 2, 445)
+        )
+
+        WIN.blit(
+            footer,
+            footer_rect
+        )
+
         pygame.display.update()
 
+        # Events
         for event in pygame.event.get():
-            if event.type == pygame.QUIT: pygame.quit(); sys.exit()
+
+            if event.type == pygame.QUIT:
+
+                pygame.quit()
+                sys.exit()
+
             if event.type == pygame.MOUSEBUTTONDOWN:
+
                 if start_btn.is_clicked(event.pos):
+
                     menu_running = False
+
                 elif quit_btn.is_clicked(event.pos):
-                    pygame.quit(); sys.exit()
+
+                    pygame.quit()
+                    sys.exit()
+
+        clock.tick(60)
 
 
 update_season()
