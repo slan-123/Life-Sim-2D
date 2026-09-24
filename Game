@@ -1645,95 +1645,372 @@ def shop():
 
 
 def inventory_screen():
+
     global hunger, energy, inventory_foods, inventory_energy
+
     choosing = True
+
     scroll = 0
     per_page = 6
 
     def build_items_list():
-   
+
         items = []
-  
+
         for food in inventory_foods.keys():
+
             qty = inventory_foods.get(food, 0)
-            items.append((f"{food.capitalize()} x{qty}", food, 'food'))
-     
+
+            items.append(
+                (
+                    f"{food.capitalize()} x{qty}",
+                    food,
+                    'food'
+                )
+            )
+
         for item in inventory_energy.keys():
+
             qty = inventory_energy.get(item, 0)
-            items.append((f"{item.capitalize()} x{qty}", item, 'energy'))
+
+            items.append(
+                (
+                    f"{item.capitalize()} x{qty}",
+                    item,
+                    'energy'
+                )
+            )
+
         return items
 
     while choosing:
+
         target_color = day_color if time_of_day == "Day" else night_color
         update_background(target_color)
         WIN.fill(bg_color)
-        WIN.blit(BIG_FONT.render("Inventory", True, BLACK), (50, 20))
 
+        # UI colours
+        if time_of_day == "Day":
+
+            panel_color = (248, 249, 252)
+            card_color = (238, 240, 245)
+            border_color = (220, 222, 230)
+            text_color = BLACK
+            muted_color = (100, 105, 115)
+
+        else:
+
+            panel_color = (30, 30, 48)
+            card_color = (42, 42, 65)
+            border_color = (70, 70, 95)
+            text_color = WHITE
+            muted_color = (170, 170, 190)
+
+        # Main inventory panel
+        pygame.draw.rect(
+            WIN,
+            panel_color,
+            (30, 20, 740, 560),
+            border_radius=20
+        )
+
+        pygame.draw.rect(
+            WIN,
+            border_color,
+            (30, 20, 740, 560),
+            2,
+            border_radius=20
+        )
+
+        # Title
+        title = BIG_FONT.render(
+            "Inventory",
+            True,
+            text_color
+        )
+
+        WIN.blit(
+            title,
+            (55, 35)
+        )
+
+        # Current stats
+        stats_text = FONT.render(
+            f"Hunger {hunger}/10   •   Energy {energy}/10",
+            True,
+            muted_color
+        )
+
+        stats_rect = stats_text.get_rect(
+            midright=(735, 55)
+        )
+
+        WIN.blit(
+            stats_text,
+            stats_rect
+        )
+
+        # Items
         all_items = build_items_list()
-        start_idx = scroll * per_page
-        visible = all_items[start_idx:start_idx + per_page]
-        inv_buttons = []
-        y = 80
-        for label, key, typ in visible:
-            inv_buttons.append((Button(50, y, 500, 40, label), key, typ))
-            y += 60
 
-  
+        start_idx = scroll * per_page
+
+        visible = all_items[
+            start_idx:start_idx + per_page
+        ]
+
+        inv_buttons = []
+
+        y = 105
+
+        for label, key, typ in visible:
+
+            item_rect = pygame.Rect(
+                55,
+                y,
+                680,
+                60
+            )
+
+            pygame.draw.rect(
+                WIN,
+                card_color,
+                item_rect,
+                border_radius=12
+            )
+
+            pygame.draw.rect(
+                WIN,
+                border_color,
+                item_rect,
+                2,
+                border_radius=12
+            )
+
+            # Item type accent
+            if typ == "food":
+
+                accent_color = ORANGE
+
+            else:
+
+                accent_color = BLUE
+
+            accent_rect = pygame.Rect(
+                55,
+                y,
+                6,
+                60
+            )
+
+            pygame.draw.rect(
+                WIN,
+                accent_color,
+                accent_rect,
+                border_radius=3
+            )
+
+            # Item button
+            button = Button(
+                70,
+                y + 8,
+                650,
+                44,
+                label,
+                color=card_color,
+                hover_color=(215, 220, 230)
+            )
+
+            inv_buttons.append(
+                (
+                    button,
+                    key,
+                    typ
+                )
+            )
+
+            y += 70
+
+        # Scroll / exit hint
+        hint = FONT.render(
+            "UP / DOWN    |    Mouse Wheel    |    ESC to exit",
+            True,
+            muted_color
+        )
+
+        hint_rect = hint.get_rect(
+            center=(WIDTH // 2, 535)
+        )
+
+        WIN.blit(
+            hint,
+            hint_rect
+        )
+
+        # Draw buttons
         for b, _, _ in inv_buttons:
             b.draw(WIN)
 
-   
-        WIN.blit(FONT.render("Use Up/Down arrows to scroll, Esc to exit", True, BLACK), (50, HEIGHT - 50))
         pygame.display.update()
 
         for event in pygame.event.get():
+
             if event.type == pygame.QUIT:
-                pygame.quit(); sys.exit()
+
+                pygame.quit()
+                sys.exit()
+
             if event.type == pygame.KEYDOWN:
+
                 if event.key == pygame.K_ESCAPE:
+
                     choosing = False
+
                 elif event.key == pygame.K_DOWN:
+
                     if (scroll + 1) * per_page < len(all_items):
                         scroll += 1
+
                 elif event.key == pygame.K_UP:
+
                     if scroll > 0:
                         scroll -= 1
-            if event.type == pygame.MOUSEBUTTONDOWN:
+
+            elif event.type == pygame.MOUSEWHEEL:
+
+                if event.y < 0:
+
+                    if (scroll + 1) * per_page < len(all_items):
+                        scroll += 1
+
+                elif event.y > 0:
+
+                    if scroll > 0:
+                        scroll -= 1
+
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+
                 for b, key, typ in inv_buttons:
+
                     if b.is_clicked(event.pos):
+
                         if typ == 'food':
+
                             if inventory_foods.get(key, 0) > 0:
-                           
+
                                 if key in foods:
-                                    hunger_gain = foods[key].get("hunger", 0)
-                                elif key in seasonal_items_by_season.get(get_current_season(), {}):
-                                    hunger_gain = seasonal_items_by_season[get_current_season()][key].get("hunger", 0)
+
+                                    hunger_gain = foods[key].get(
+                                        "hunger",
+                                        0
+                                    )
+
+                                elif key in seasonal_items_by_season.get(
+                                    get_current_season(),
+                                    {}
+                                ):
+
+                                    hunger_gain = seasonal_items_by_season[
+                                        get_current_season()
+                                    ][key].get(
+                                        "hunger",
+                                        0
+                                    )
+
                                 elif key in supermarket_items:
-                                    hunger_gain = supermarket_items[key].get("hunger", 0)
+
+                                    hunger_gain = supermarket_items[
+                                        key
+                                    ].get(
+                                        "hunger",
+                                        0
+                                    )
+
                                 else:
+
                                     hunger_gain = 0
-                               
-                                globals()['hunger'] = min(10, globals().get('hunger', 0) + hunger_gain)
+
+                                globals()['hunger'] = min(
+                                    10,
+                                    globals().get(
+                                        'hunger',
+                                        0
+                                    ) + hunger_gain
+                                )
+
                                 inventory_foods[key] -= 1
-                                show_message(f"You ate a {key.capitalize()}! Hunger +{hunger_gain}")
+
+                                show_message(
+                                    f"You ate a {key.capitalize()}! Hunger +{hunger_gain}"
+                                )
+
                         elif typ == 'energy':
+
                             if inventory_energy.get(key, 0) > 0:
+
                                 if key in energy_items:
-                                    energy_gain = energy_items[key].get("energy", 0)
-                                elif key in seasonal_items_by_season.get(get_current_season(), {}):
-                                    energy_gain = seasonal_items_by_season[get_current_season()][key].get("energy", 0)
+
+                                    energy_gain = energy_items[key].get(
+                                        "energy",
+                                        0
+                                    )
+
+                                elif key in seasonal_items_by_season.get(
+                                    get_current_season(),
+                                    {}
+                                ):
+
+                                    energy_gain = seasonal_items_by_season[
+                                        get_current_season()
+                                    ][key].get(
+                                        "energy",
+                                        0
+                                    )
+
                                 elif key in supermarket_items:
-                                    energy_gain = supermarket_items[key].get("energy", 0)
+
+                                    energy_gain = supermarket_items[
+                                        key
+                                    ].get(
+                                        "energy",
+                                        0
+                                    )
+
                                 else:
+
                                     energy_gain = 0
-                                globals()['energy'] = min(10, globals().get('energy', 0) + energy_gain)
-                                # apply health from supermarket items if present
+
+                                globals()['energy'] = min(
+                                    10,
+                                    globals().get(
+                                        'energy',
+                                        0
+                                    ) + energy_gain
+                                )
+
+                                # Apply health from supermarket items if present
                                 if key in supermarket_items:
-                                    globals()['health'] = min(10, globals().get('health', 0) + supermarket_items[key].get("health", 0))
+
+                                    globals()['health'] = min(
+                                        10,
+                                        globals().get(
+                                            'health',
+                                            0
+                                        ) + supermarket_items[
+                                            key
+                                        ].get(
+                                            "health",
+                                            0
+                                        )
+                                    )
+
                                 inventory_energy[key] -= 1
-                                show_message(f"You used a {key.capitalize()}! Energy +{energy_gain}")
 
+                                show_message(
+                                    f"You used a {key.capitalize()}! Energy +{energy_gain}"
+                                )
 
+        clock.tick(60)
 def achievements_screen():
     choosing = True
     while choosing:
