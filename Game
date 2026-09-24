@@ -3036,7 +3036,7 @@ def gd_runner_minigame():
     from collections import deque
     import math, random, sys, pygame
 
-    mode = random.choice(["ship", "wave"])   #"cube", "wave",     thats removed for testing purposes
+    mode = random.choice(["cube", "wave", "ship"])   #"cube", "wave", "ship"    thats removed for testing purposes
     clock = pygame.time.Clock()
     fixed_screen_x = 100
     camera_x = 0.0
@@ -3561,115 +3561,337 @@ def rhythm_minigame():
 
 
 def go_to_work():
-    
+
     global Balance, hunger, energy, health, day
+
     choosing = True
 
-    cashier_btn = Button(120, 220, 150, 60, "Cashier", color=GRAY)
-    programmer_btn = Button(290, 220, 150, 60, "Programmer", color=GRAY)
-    gambler_btn = Button(460, 220, 150, 60, "Gambler", color=GRAY)
-    chef_btn = Button(120, 320, 150, 60, "Chef", color=ORANGE)
-    delivery_btn = Button(290, 320, 150, 60, "Delivery", color=ORANGE)
-    streamer_btn = Button(460, 320, 150, 60, "Streamer", color=ORANGE)
-    gd_runner_btn = Button(460, 450, 150, 60, "GD Runner", color=ORANGE)
-    fishing_btn = Button(290, 450, 150, 60, "Fish", color=ORANGE)
-    rhythm_btn = Button(120, 450, 150, 60, "Perform", color=ORANGE)
-    
-   
+    # Job buttons
+    cashier_btn = Button(
+        70, 155, 210, 82,
+        "Cashier",
+        color=(107, 111, 138),
+        hover_color=(133, 137, 163)
+    )
 
+    programmer_btn = Button(
+        295, 155, 210, 82,
+        "Programmer",
+        color=(107, 111, 138),
+        hover_color=(133, 137, 163)
+    )
 
+    gambler_btn = Button(
+        520, 155, 210, 82,
+        "Gambler",
+        color=(107, 111, 138),
+        hover_color=(133, 137, 163)
+    )
+
+    chef_btn = Button(
+        70, 245, 210, 82,
+        "Chef",
+        color=(107, 111, 138),
+        hover_color=(133, 137, 163)
+    )
+
+    delivery_btn = Button(
+        295, 245, 210, 82,
+        "Delivery",
+        color=(107, 111, 138),
+        hover_color=(133, 137, 163)
+    )
+
+    streamer_btn = Button(
+        520, 245, 210, 82,
+        "Streamer",
+        color=(107, 111, 138),
+        hover_color=(133, 137, 163)
+    )
+
+    rhythm_btn = Button(
+        70, 335, 210, 82,
+        "Perform",
+        color=(107, 111, 138),
+        hover_color=(133, 137, 163)
+    )
+
+    fishing_btn = Button(
+        295, 335, 210, 82,
+        "Fish",
+        color=(107, 111, 138),
+        hover_color=(133, 137, 163)
+    )
+
+    gd_runner_btn = Button(
+        520, 335, 210, 82,
+        "GD Runner",
+        color=(107, 111, 138),
+        hover_color=(133, 137, 163)
+    )
 
     chosen_income = 0
-    chosen_job = None   
-    
+    chosen_job = None
+
     while choosing:
+
         target_color = day_color if time_of_day == "Day" else night_color
         update_background(target_color)
         WIN.fill(bg_color)
-        WIN.blit(BIG_FONT.render("Choose a Job", True, BLACK), (300, 140))
+
+        # UI colours
+        if time_of_day == "Day":
+
+            panel_color = (248, 249, 252)
+            card_color = (238, 240, 245)
+            border_color = (220, 222, 230)
+            text_color = BLACK
+            muted_color = (75, 80, 95)
+
+        else:
+
+            panel_color = (30, 30, 48)
+            card_color = (42, 42, 65)
+            border_color = (70, 70, 95)
+            text_color = WHITE
+            muted_color = (190, 192, 210)
+
+        # Main panel
+        pygame.draw.rect(
+            WIN,
+            panel_color,
+            (30, 20, 740, 560),
+            border_radius=20
+        )
+
+        pygame.draw.rect(
+            WIN,
+            border_color,
+            (30, 20, 740, 560),
+            2,
+            border_radius=20
+        )
+
+        # Title
+        title = BIG_FONT.render(
+            "Choose a Job",
+            True,
+            text_color
+        )
+
+        WIN.blit(
+            title,
+            (55, 35)
+        )
+
+        # Balance
+        balance_text = FONT.render(
+            f"Balance: £{Balance}",
+            True,
+            GREEN
+        )
+
+        balance_rect = balance_text.get_rect(
+            midright=(735, 55)
+        )
+
+        WIN.blit(
+            balance_text,
+            balance_rect
+        )
+
+        # Section label
+        section_text = FONT.render(
+            "AVAILABLE JOBS",
+            True,
+            muted_color
+        )
+
+        WIN.blit(
+            section_text,
+            (55, 105)
+        )
+
+        # Job buttons
         cashier_btn.draw(WIN)
         programmer_btn.draw(WIN)
         gambler_btn.draw(WIN)
+
         chef_btn.draw(WIN)
         delivery_btn.draw(WIN)
         streamer_btn.draw(WIN)
-        gd_runner_btn.draw(WIN)
-        fishing_btn.draw(WIN)
+
         rhythm_btn.draw(WIN)
-        WIN.blit(FONT.render("Esc to cancel / exit", True, BLACK), (50, 520))
+        fishing_btn.draw(WIN)
+        gd_runner_btn.draw(WIN)
+
+        # Job descriptions
+        description_color = muted_color
+
+        descriptions = [
+            ("£10–£20", 70, 225),
+            ("£30–£80", 295, 225),
+            ("−£50–£200", 520, 225),
+
+            ("£15–£40", 70, 315),
+            ("£20–£60", 295, 315),
+            ("£5–£100", 520, 315),
+
+            ("£50–£100", 70, 405),
+            ("£5–£120", 295, 405),
+            ("£50–£120", 520, 405)
+        ]
+
+        for text, x, y in descriptions:
+
+            income_text = FONT.render(
+                text,
+                True,
+                description_color
+            )
+
+            income_rect = income_text.get_rect(
+                center=(x + 105, y)
+            )
+
+            WIN.blit(
+                income_text,
+                income_rect
+            )
+
+        # Footer
+        instruction = FONT.render(
+            "Click a job to start working    |    ESC to cancel",
+            True,
+            muted_color
+        )
+
+        instruction_rect = instruction.get_rect(
+            center=(WIDTH // 2, 535)
+        )
+
+        WIN.blit(
+            instruction,
+            instruction_rect
+        )
+
         pygame.display.update()
 
+        # Events
         for event in pygame.event.get():
+
             if event.type == pygame.QUIT:
-                pygame.quit(); sys.exit()
-            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-                choosing = False
+
+                pygame.quit()
+                sys.exit()
+
+            if event.type == pygame.KEYDOWN:
+
+                if event.key == pygame.K_ESCAPE:
+
+                    choosing = False
+
             if event.type == pygame.MOUSEBUTTONDOWN:
+
                 if cashier_btn.is_clicked(event.pos):
+
                     chosen_job = "cashier"
                     chosen_income = cashier_minigame()
                     choosing = False
+
                 elif programmer_btn.is_clicked(event.pos):
+
                     chosen_job = "programmer"
                     chosen_income = programmer_minigame()
                     choosing = False
+
                 elif gambler_btn.is_clicked(event.pos):
+
                     chosen_job = "gambler"
                     chosen_income = gambler_minigame()
                     choosing = False
+
                 elif chef_btn.is_clicked(event.pos):
+
                     chosen_job = "chef"
                     chosen_income = chef_minigame()
                     choosing = False
+
                 elif delivery_btn.is_clicked(event.pos):
+
                     chosen_job = "delivery"
                     chosen_income = delivery_minigame()
                     choosing = False
+
                 elif streamer_btn.is_clicked(event.pos):
+
                     chosen_job = "streamer"
                     chosen_income = streamer_minigame()
                     choosing = False
-                elif gd_runner_btn.is_clicked(event.pos):
-                    chosen_job = "gd_runner"
-                    chosen_income = gd_runner_minigame()
-                    choosing = False
-                elif fishing_btn.is_clicked(event.pos): 
-                    chosen_job = "fishing"
-                    chosen_income = fishing_minigame()
-                    choosing = False
+
                 elif rhythm_btn.is_clicked(event.pos):
+
                     chosen_job = "rhythm"
                     chosen_income = rhythm_minigame()
                     choosing = False
-        
+
+                elif fishing_btn.is_clicked(event.pos):
+
+                    chosen_job = "fishing"
+                    chosen_income = fishing_minigame()
+                    choosing = False
+
+                elif gd_runner_btn.is_clicked(event.pos):
+
+                    chosen_job = "gd_runner"
+                    chosen_income = gd_runner_minigame()
+                    choosing = False
+
+        clock.tick(60)
+
+    # Cancelled
     if chosen_job is None:
         return
+
+    # Career progression
     career_level = career_data[chosen_job]["level"]
     pay_bonus = get_career_pay_bonus(career_level)
 
     if chosen_income > 0:
-        chosen_income = int(chosen_income * (1 + pay_bonus / 100))
+
+        chosen_income = int(
+            chosen_income * (1 + pay_bonus / 100)
+        )
 
     Balance += chosen_income
+
     hunger -= 2
     energy -= 2
+
+    # Career XP
     job_xp = 50
     career_data[chosen_job]["xp"] += job_xp
 
     check_career_level_up(chosen_job)
+
+    # Random event
     random_event()
 
+    # Advance day
     day += 1
 
+    # Housing costs
     housing_cost = housing_options[current_home]["daily_cost"]
     Balance = max(0, Balance - housing_cost)
 
+    # Housing bonuses
     energy_bonus = housing_options[current_home]["energy_bonus"]
     health_bonus = housing_options[current_home]["health_bonus"]
 
     energy = min(10, energy + energy_bonus)
     health = min(10, health + health_bonus)
 
+    # Update game systems
     update_season()
     update_daily_prices()
     exhaustion_penalty()
