@@ -3944,17 +3944,30 @@ def toggle_time(new_time):
 
 def start_menu():
 
-    menu_running = True
+    global Balance, hunger, energy, health, day
+    global time_of_day, current_home
+    global inventory_foods, inventory_energy
+    global career_data, season_index
 
-    start_btn = Button(
-        300, 250, 200, 60,
-        "Start Game",
+    menu_running = True
+    message = ""
+
+    continue_btn = Button(
+        300, 245, 200, 60,
+        "Continue",
+        color=(107, 111, 138),
+        hover_color=(133, 137, 163)
+    )
+
+    new_game_btn = Button(
+        300, 325, 200, 60,
+        "New Life",
         color=(107, 111, 138),
         hover_color=(133, 137, 163)
     )
 
     quit_btn = Button(
-        300, 330, 200, 60,
+        300, 405, 200, 60,
         "Quit",
         color=(150, 80, 90),
         hover_color=(175, 100, 110)
@@ -3971,14 +3984,14 @@ def start_menu():
         pygame.draw.rect(
             WIN,
             (248, 249, 252),
-            (150, 70, 500, 460),
+            (150, 55, 500, 485),
             border_radius=24
         )
 
         pygame.draw.rect(
             WIN,
             (220, 222, 230),
-            (150, 70, 500, 460),
+            (150, 55, 500, 485),
             2,
             border_radius=24
         )
@@ -3991,7 +4004,7 @@ def start_menu():
         )
 
         title_rect = title.get_rect(
-            center=(WIDTH // 2, 135)
+            center=(WIDTH // 2, 120)
         )
 
         WIN.blit(
@@ -4003,11 +4016,11 @@ def start_menu():
         subtitle = FONT.render(
             "Build your life. Make your choices.",
             True,
-            (100, 105, 115)
+            (75, 80, 95)
         )
 
         subtitle_rect = subtitle.get_rect(
-            center=(WIDTH // 2, 180)
+            center=(WIDTH // 2, 165)
         )
 
         WIN.blit(
@@ -4023,7 +4036,7 @@ def start_menu():
         )
 
         version_rect = version.get_rect(
-            center=(WIDTH // 2, 215)
+            center=(WIDTH // 2, 205)
         )
 
         WIN.blit(
@@ -4032,23 +4045,34 @@ def start_menu():
         )
 
         # Buttons
-        start_btn.draw(WIN)
+        continue_btn.draw(WIN)
+        new_game_btn.draw(WIN)
         quit_btn.draw(WIN)
 
-        # Footer
-        footer = FONT.render(
-            "A 2D life simulation experience",
-            True,
-            (120, 125, 135)
-        )
+        # Save status
+        if os.path.exists("save.json"):
 
-        footer_rect = footer.get_rect(
-            center=(WIDTH // 2, 445)
+            save_status = FONT.render(
+                "Saved game available",
+                True,
+                GREEN
+            )
+
+        else:
+
+            save_status = FONT.render(
+                "No saved game found",
+                True,
+                (120, 125, 135)
+            )
+
+        save_status_rect = save_status.get_rect(
+            center=(WIDTH // 2, 475)
         )
 
         WIN.blit(
-            footer,
-            footer_rect
+            save_status,
+            save_status_rect
         )
 
         pygame.display.update()
@@ -4063,10 +4087,59 @@ def start_menu():
 
             if event.type == pygame.MOUSEBUTTONDOWN:
 
-                if start_btn.is_clicked(event.pos):
+                # Continue
+                if continue_btn.is_clicked(event.pos):
+
+                    if os.path.exists("save.json"):
+
+                        load_game()
+                        menu_running = False
+
+                    else:
+
+                        show_message(
+                            "No saved game found.",
+                            RED
+                        )
+
+                # New Life
+                elif new_game_btn.is_clicked(event.pos):
+
+                    Balance = 100
+                    hunger = 10
+                    energy = 10
+                    health = 10
+                    day = 1
+                    time_of_day = "Day"
+
+                    current_home = "Shared Room"
+
+                    inventory_foods = {
+                        food: 0
+                        for food in foods
+                    }
+
+                    inventory_energy = {
+                        item: 0
+                        for item in energy_items
+                    }
+
+                    career_data = {
+                        job: {
+                            "level": 1,
+                            "xp": 0
+                        }
+                        for job in career_data
+                    }
+
+                    season_index = 0
+
+                    update_season()
+                    update_daily_prices()
 
                     menu_running = False
 
+                # Quit
                 elif quit_btn.is_clicked(event.pos):
 
                     pygame.quit()
