@@ -7,9 +7,9 @@ import os
 
 
 pygame.init()
-pygame.mixer.init(buffer=64)
+pygame.mixer.init(buffer=64 )
 
-WIDTH, HEIGHT = 800, 600
+WIDTH, HEIGHT = 850, 700
 WIN = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Life Simulator 2D")
 
@@ -31,7 +31,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 FONT = pygame.font.Font(
     os.path.join(BASE_DIR, "assets", "fonts", "Poppins-Regular.ttf"),
-    22
+    24
 )
 
 BIG_FONT = pygame.font.Font(
@@ -110,7 +110,6 @@ jobs = {
     "cashier": (10, 20),
     "programmer": (30, 80),
     "gambler": (-50, 200),
-    # new jobs (ranges)
     "chef": (15, 40),
     "delivery": (20, 60),
     "streamer": (5, 100),
@@ -1141,20 +1140,72 @@ def show_status():
     )   
 
 
-shop_btn = Button(590, 55, 170, 45, "Shop", color=ORANGE)
-work_btn = Button(590, 115, 170, 45, "Work", color=BLUE)
+shop_btn = Button(
+    635, 65, 165, 45,
+    "Shop",
+    color=ORANGE
+)
 
-day_btn = Button(590, 190, 80, 45, "Day", color=YELLOW)
-night_btn = Button(680, 190, 80, 45, "Night", color=DARK_BLUE)
+work_btn = Button(
+    635, 125, 165, 45,
+    "Work",
+    color=BLUE
+)
 
-save_btn = Button(590, 270, 80, 45, "Save", color=GREEN)
-load_btn = Button(680, 270, 80, 45, "Load", color=GREEN)
+world_btn = Button(
+    635, 185, 165, 45,
+    "World Map",
+    color=(80, 150, 120),
+    hover_color=(105, 175, 145)
+)
 
-inv_btn = Button(590, 330, 170, 45, "Inventory", color=(0, 200, 0))
-ach_btn = Button(590, 390, 170, 45, "Achievements", color=(255, 165, 0))
+day_btn = Button(
+    635, 265, 80, 45,
+    "Day",
+    color=YELLOW
+)
 
-housing_btn = Button(590, 450, 170, 45, "Housing", color=(120, 80, 200))
-career_btn = Button(590, 510, 170, 45, "Careers", color=(60, 150, 220))
+night_btn = Button(
+    725, 265, 75, 45,
+    "Night",
+    color=DARK_BLUE
+)
+
+save_btn = Button(
+    635, 350, 80, 45,
+    "Save",
+    color=GREEN
+)
+
+load_btn = Button(
+    725, 350, 75, 45,
+    "Load",
+    color=GREEN
+)
+
+inv_btn = Button(
+    635, 420, 165, 45,
+    "Inventory",
+    color=(0, 200, 0)
+)
+
+ach_btn = Button(
+    635, 480, 165, 45,
+    "Achievements",
+    color=ORANGE
+)
+
+housing_btn = Button(
+    635, 540, 165, 45,
+    "Housing",
+    color=(120, 80, 200)
+)
+
+career_btn = Button(
+    635, 600, 165, 45,
+    "Careers",
+    color=(60, 150, 220)
+)   
 
 
 def clamp_price(p):
@@ -1289,15 +1340,15 @@ def shop():
         # Main shop panel
         pygame.draw.rect(
             WIN,
-            panel_color,
-            (30, 20, 740, 560),
+            control_panel_color,
+            (600, 15, 235, 670),
             border_radius=20
         )
 
         pygame.draw.rect(
             WIN,
-            border_color,
-            (30, 20, 740, 560),
+            control_border_color,
+            (600, 15, 235, 670),
             2,
             border_radius=20
         )
@@ -3959,7 +4010,325 @@ def toggle_time(new_time):
     global time_of_day
     time_of_day = new_time
     show_message(f"It is now {time_of_day}")
+def world_map():
 
+    running = True
+
+    selected_location = None
+
+    back_btn = Button(
+        325, 610, 200, 55,
+        "Back",
+        color=(107, 111, 138),
+        hover_color=(133, 137, 163)
+    )
+
+    locations = [
+        ("Home", 180, 200),
+        ("Park", 610, 200),
+        ("Café", 235, 350),
+        ("Supermarket", 610, 350),
+        ("Work", 180, 500),
+        ("Hospital", 610, 500)
+    ]
+
+    location_info = {
+        "Home": {
+            "description": "Your current home",
+            "travel_time": "2 hours",
+            "availability": "Always"
+        },
+        "Park": {
+            "description": "Relax and recover some energy",
+            "travel_time": "1 hour",
+            "availability": "Day"
+        },
+        "Café": {
+            "description": "Grab a drink and take a break",
+            "travel_time": "1 hour",
+            "availability": "Day"
+        },
+        "Supermarket": {
+            "description": "Buy food and energy items",
+            "travel_time": "1 hour",
+            "availability": "Day"
+        },
+        "Work": {
+            "description": "Go to your current workplace",
+            "travel_time": "2 hours",
+            "availability": "Day"
+        },
+        "Hospital": {
+            "description": "Recover when your health is low",
+            "travel_time": "2 hours",
+            "availability": "Always"
+        }
+    }
+
+    while running:
+
+        target_color = day_color if time_of_day == "Day" else night_color
+        update_background(target_color)
+
+        WIN.fill(bg_color)
+
+        if time_of_day == "Day":
+
+            panel_color = (248, 249, 252)
+            border_color = (220, 222, 230)
+            text_color = BLACK
+            muted_color = (100, 105, 115)
+
+            map_color = (222, 235, 218)
+            road_color = (190, 190, 190)
+
+            location_color = (107, 111, 138)
+            selected_color = (80, 150, 120)
+
+        else:
+
+            panel_color = (30, 30, 48)
+            border_color = (70, 70, 95)
+            text_color = WHITE
+            muted_color = (170, 170, 190)
+
+            map_color = (42, 55, 48)
+            road_color = (75, 75, 85)
+
+            location_color = (133, 137, 163)
+            selected_color = (80, 150, 120)
+
+        # Main map panel
+
+        pygame.draw.rect(
+            WIN,
+            panel_color,
+            (35, 25, 780, 640),
+            border_radius=24
+        )
+
+        pygame.draw.rect(
+            WIN,
+            border_color,
+            (35, 25, 780, 640),
+            2,
+            border_radius=24
+        )
+
+        # Title
+
+        title = BIG_FONT.render(
+            "World Map",
+            True,
+            text_color
+        )
+
+        title_rect = title.get_rect(
+            center=(WIDTH // 2, 70)
+        )
+
+        WIN.blit(
+            title,
+            title_rect
+        )
+
+        subtitle = FONT.render(
+            "Explore the city",
+            True,
+            muted_color
+        )
+
+        subtitle_rect = subtitle.get_rect(
+            center=(WIDTH // 2, 105)
+        )
+
+        WIN.blit(
+            subtitle,
+            subtitle_rect
+        )
+
+        # Map area
+
+        pygame.draw.rect(
+            WIN,
+            map_color,
+            (65, 135, 720, 440),
+            border_radius=20
+        )
+
+        # Roads
+
+        pygame.draw.rect(
+            WIN,
+            road_color,
+            (105, 250, 640, 35),
+            border_radius=12
+        )
+
+        pygame.draw.rect(
+            WIN,
+            road_color,
+            (390, 165, 35, 370),
+            border_radius=12
+        )
+
+        pygame.draw.rect(
+            WIN,
+            road_color,
+            (120, 420, 610, 30),
+            border_radius=12
+        )
+
+        # Location markers
+
+        for name, x, y in locations:
+
+            if selected_location == name:
+
+                current_color = selected_color
+                radius = 38
+
+            else:
+
+                current_color = location_color
+                radius = 32
+
+            pygame.draw.circle(
+                WIN,
+                current_color,
+                (x, y),
+                radius
+            )
+
+            pygame.draw.circle(
+                WIN,
+                WHITE,
+                (x, y),
+                radius,
+                2
+            )
+
+            label = FONT.render(
+                name,
+                True,
+                text_color
+            )
+
+            label_rect = label.get_rect(
+                center=(x, y + 55)
+            )
+
+            WIN.blit(
+                label,
+                label_rect
+            )
+
+        # Selected location information
+
+        if selected_location is not None:
+
+            info = location_info[selected_location]
+
+            pygame.draw.rect(
+                WIN,
+                panel_color,
+                (175, 480, 500, 90),
+                border_radius=16
+            )
+
+            pygame.draw.rect(
+                WIN,
+                border_color,
+                (175, 480, 500, 90),
+                2,
+                border_radius=16
+            )
+
+            location_title = FONT.render(
+                selected_location,
+                True,
+                text_color
+            )
+
+            WIN.blit(
+                location_title,
+                (195, 490)
+            )
+
+            description = pygame.font.Font(
+                os.path.join(
+                    BASE_DIR,
+                    "assets",
+                    "fonts",
+                    "Poppins-Regular.ttf"
+                ),
+                18
+            ).render(
+                info["description"],
+                True,
+                muted_color
+            )
+
+            WIN.blit(
+                description,
+                (195, 520)
+            )
+
+            details = pygame.font.Font(
+                os.path.join(
+                    BASE_DIR,
+                    "assets",
+                    "fonts",
+                    "Poppins-Regular.ttf"
+                ),
+                16
+            ).render(
+                "Travel: " + info["travel_time"] +
+                "   •   Available: " + info["availability"],
+                True,
+                muted_color
+            )
+
+            WIN.blit(
+                details,
+                (430, 495)
+            )
+
+        # Back button
+
+        back_btn.draw(WIN)
+
+        pygame.display.update()
+
+        for event in pygame.event.get():
+
+            if event.type == pygame.QUIT:
+
+                pygame.quit()
+                sys.exit()
+
+            if event.type == pygame.MOUSEBUTTONDOWN:
+
+                if back_btn.is_clicked(event.pos):
+
+                    running = False
+
+                else:
+
+                    for name, x, y in locations:
+
+                        location_rect = pygame.Rect(
+                            x - 40,
+                            y - 40,
+                            80,
+                            80
+                        )
+
+                        if location_rect.collidepoint(event.pos):
+
+                            selected_location = name
+
+        clock.tick(60)
 def settings_screen():
 
     running = True
@@ -4324,14 +4693,14 @@ while running:
     pygame.draw.rect(
         WIN,
         control_panel_color,
-        (550, 15, 235, 570),
+        (580, 15, 255, 670),
         border_radius=20
     )
 
     pygame.draw.rect(
         WIN,
         control_border_color,
-        (550, 15, 235, 570),
+        (580, 15, 255, 670),
         2,
         border_radius=20
     )
@@ -4340,19 +4709,19 @@ while running:
 
     WIN.blit(
         FONT.render("ACTIONS", True, section_color),
-        (565, 30)
+        (600, 30)
     )
 
     WIN.blit(
         FONT.render("TIME", True, section_color),
-        (565, 165)
+        (600, 235)
     )
 
     WIN.blit(
         FONT.render("GAME", True, section_color),
-        (565, 245)
+        (600, 320)
     )
-    for btn in [shop_btn, work_btn, day_btn, night_btn, save_btn, load_btn, inv_btn, ach_btn, housing_btn, career_btn]:
+    for btn in [shop_btn, work_btn, world_btn, day_btn, night_btn, save_btn, load_btn, inv_btn, ach_btn, housing_btn, career_btn]:
         btn.draw(WIN)
 
     pygame.display.update()
@@ -4365,6 +4734,8 @@ while running:
                 shop()
             elif work_btn.is_clicked(event.pos):
                 go_to_work()
+            elif world_btn.is_clicked(event.pos):
+                world_map()
             elif day_btn.is_clicked(event.pos):
                 toggle_time("Day")
             elif night_btn.is_clicked(event.pos):
