@@ -3941,7 +3941,130 @@ def toggle_time(new_time):
     time_of_day = new_time
     show_message(f"It is now {time_of_day}")
 
+def settings_screen():
 
+    running = True
+
+    fullscreen = False
+
+    fullscreen_btn = Button(
+        300, 230, 200, 60,
+        "Windowed",
+        color=(107, 111, 138),
+        hover_color=(133, 137, 163)
+    )
+
+    back_btn = Button(
+        300, 330, 200, 60,
+        "Back",
+        color=(107, 111, 138),
+        hover_color=(133, 137, 163)
+    )
+
+    while running:
+
+        # Background
+        update_background(day_color)
+        WIN.fill(bg_color)
+
+        # Main panel
+        pygame.draw.rect(
+            WIN,
+            (248, 249, 252),
+            (150, 80, 500, 420),
+            border_radius=24
+        )
+
+        pygame.draw.rect(
+            WIN,
+            (220, 222, 230),
+            (150, 80, 500, 420),
+            2,
+            border_radius=24
+        )
+
+        # Title
+        title = BIG_FONT.render(
+            "Settings",
+            True,
+            BLACK
+        )
+
+        title_rect = title.get_rect(
+            center=(WIDTH // 2, 135)
+        )
+
+        WIN.blit(title, title_rect)
+
+        # Display label
+        display_label = FONT.render(
+            "Display Mode",
+            True,
+            (75, 80, 95)
+        )
+
+        display_rect = display_label.get_rect(
+            center=(WIDTH // 2, 200)
+        )
+
+        WIN.blit(display_label, display_rect)
+
+        # Button
+        fullscreen_btn.text = (
+            "Fullscreen"
+            if fullscreen
+            else "Windowed"
+        )
+
+        fullscreen_btn.draw(WIN)
+        back_btn.draw(WIN)
+
+        # Footer
+        hint = FONT.render(
+            "More settings coming soon",
+            True,
+            (120, 125, 135)
+        )
+
+        hint_rect = hint.get_rect(
+            center=(WIDTH // 2, 425)
+        )
+
+        WIN.blit(hint, hint_rect)
+
+        pygame.display.update()
+
+        for event in pygame.event.get():
+
+            if event.type == pygame.QUIT:
+
+                pygame.quit()
+                sys.exit()
+
+            if event.type == pygame.MOUSEBUTTONDOWN:
+
+                if fullscreen_btn.is_clicked(event.pos):
+
+                    fullscreen = not fullscreen
+
+                    if fullscreen:
+
+                        pygame.display.set_mode(
+                            (WIDTH, HEIGHT),
+                            pygame.FULLSCREEN
+                        )
+
+                    else:
+
+                        pygame.display.set_mode(
+                            (WIDTH, HEIGHT)
+                        )
+
+                elif back_btn.is_clicked(event.pos):
+
+                    running = False
+
+        clock.tick(60)
 def start_menu():
 
     global Balance, hunger, energy, health, day
@@ -3965,9 +4088,15 @@ def start_menu():
         color=(107, 111, 138),
         hover_color=(133, 137, 163)
     )
+    settings_btn = Button(
+        300, 405, 200, 60,
+        "Settings",
+        color=(107, 111, 138),
+        hover_color=(133, 137, 163)
+    )
 
     quit_btn = Button(
-        300, 405, 200, 60,
+        300, 485, 200, 60,
         "Quit",
         color=(150, 80, 90),
         hover_color=(175, 100, 110)
@@ -3984,14 +4113,14 @@ def start_menu():
         pygame.draw.rect(
             WIN,
             (248, 249, 252),
-            (150, 55, 500, 485),
+            (150, 55, 500, 550),
             border_radius=24
         )
 
         pygame.draw.rect(
             WIN,
             (220, 222, 230),
-            (150, 55, 500, 485),
+            (150, 55, 500, 550),
             2,
             border_radius=24
         )
@@ -4047,6 +4176,7 @@ def start_menu():
         # Buttons
         continue_btn.draw(WIN)
         new_game_btn.draw(WIN)
+        settings_btn.draw(WIN)
         quit_btn.draw(WIN)
 
         # Save status
@@ -4067,7 +4197,7 @@ def start_menu():
             )
 
         save_status_rect = save_status.get_rect(
-            center=(WIDTH // 2, 475)
+            center=(WIDTH // 2, 220)
         )
 
         WIN.blit(
@@ -4138,6 +4268,9 @@ def start_menu():
                     update_daily_prices()
 
                     menu_running = False
+                elif settings_btn.is_clicked(event.pos):
+
+                    settings_screen()
 
                 # Quit
                 elif quit_btn.is_clicked(event.pos):
