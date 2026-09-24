@@ -2012,23 +2012,209 @@ def inventory_screen():
 
         clock.tick(60)
 def achievements_screen():
+
     choosing = True
+
     while choosing:
+
         target_color = day_color if time_of_day == "Day" else night_color
         update_background(target_color)
         WIN.fill(bg_color)
-        WIN.blit(BIG_FONT.render("Achievements", True, BLACK), (50, 20))
-        y = 80
+
+        # UI colours
+        if time_of_day == "Day":
+
+            panel_color = (248, 249, 252)
+            card_color = (238, 240, 245)
+            border_color = (220, 222, 230)
+            text_color = BLACK
+            muted_color = (100, 105, 115)
+
+        else:
+
+            panel_color = (30, 30, 48)
+            card_color = (42, 42, 65)
+            border_color = (70, 70, 95)
+            text_color = WHITE
+            muted_color = (170, 170, 190)
+
+        # Main panel
+        pygame.draw.rect(
+            WIN,
+            panel_color,
+            (30, 20, 740, 560),
+            border_radius=20
+        )
+
+        pygame.draw.rect(
+            WIN,
+            border_color,
+            (30, 20, 740, 560),
+            2,
+            border_radius=20
+        )
+
+        # Title
+        title = BIG_FONT.render(
+            "Achievements",
+            True,
+            text_color
+        )
+
+        WIN.blit(
+            title,
+            (55, 35)
+        )
+
+        # Achievement count
+        unlocked_count = sum(
+            1
+            for info in achievements.values()
+            if info["unlocked"]
+        )
+
+        count_text = FONT.render(
+            f"{unlocked_count}/{len(achievements)} unlocked",
+            True,
+            muted_color
+        )
+
+        count_rect = count_text.get_rect(
+            midright=(735, 55)
+        )
+
+        WIN.blit(
+            count_text,
+            count_rect
+        )
+
+        # Achievement cards
+        y = 105
+
         for ach, info in achievements.items():
-            status = "Unlocked" if info["unlocked"] else "Locked"
-            text = f"{info['desc']} - {status}"
-            WIN.blit(FONT.render(text, True, GREEN if info["unlocked"] else RED), (50, y))
-            y += 50
+
+            unlocked = info["unlocked"]
+
+            card = pygame.Rect(
+                55,
+                y,
+                680,
+                75
+            )
+
+            pygame.draw.rect(
+                WIN,
+                card_color,
+                card,
+                border_radius=14
+            )
+
+            # Card border
+            if unlocked:
+
+                achievement_border = GREEN
+
+            else:
+
+                achievement_border = border_color
+
+            pygame.draw.rect(
+                WIN,
+                achievement_border,
+                card,
+                2,
+                border_radius=14
+            )
+
+            # Status accent
+            accent_rect = pygame.Rect(
+                55,
+                y,
+                6,
+                75
+            )
+
+            pygame.draw.rect(
+                WIN,
+                GREEN if unlocked else (120, 125, 135),
+                accent_rect,
+                border_radius=3
+            )
+
+            # Achievement name
+            name_text = FONT.render(
+                ach.replace("_", " ").title(),
+                True,
+                text_color
+            )
+
+            WIN.blit(
+                name_text,
+                (80, y + 10)
+            )
+
+            # Description
+            desc_text = FONT.render(
+                info["desc"],
+                True,
+                muted_color
+            )
+
+            WIN.blit(
+                desc_text,
+                (80, y + 40)
+            )
+
+            # Status
+            status_text = FONT.render(
+                "UNLOCKED" if unlocked else "LOCKED",
+                True,
+                GREEN if unlocked else muted_color
+            )
+
+            status_rect = status_text.get_rect(
+                midright=(710, y + 37)
+            )
+
+            WIN.blit(
+                status_text,
+                status_rect
+            )
+
+            y += 88
+
+        # Exit hint
+        hint = FONT.render(
+            "ESC to return",
+            True,
+            muted_color
+        )
+
+        hint_rect = hint.get_rect(
+            center=(WIDTH // 2, 535)
+        )
+
+        WIN.blit(
+            hint,
+            hint_rect
+        )
 
         pygame.display.update()
+
         for event in pygame.event.get():
-            if event.type == pygame.QUIT: pygame.quit(); sys.exit()
-            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE: choosing = False
+
+            if event.type == pygame.QUIT:
+
+                pygame.quit()
+                sys.exit()
+
+            if event.type == pygame.KEYDOWN:
+
+                if event.key == pygame.K_ESCAPE:
+
+                    choosing = False
+
+        clock.tick(60)
 def housing_screen():
 
     global current_home, Balance
