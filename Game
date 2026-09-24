@@ -6,7 +6,9 @@ import time
 import os
 
 
-pygame.init()   
+pygame.init()
+pygame.mixer.init(buffer=64)
+
 WIDTH, HEIGHT = 800, 600
 WIN = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Life Simulator 2D")
@@ -35,6 +37,23 @@ FONT = pygame.font.Font(
 BIG_FONT = pygame.font.Font(
     os.path.join(BASE_DIR, "assets", "fonts", "Poppins-SemiBold.ttf"),
     34
+)
+AUDIO_DIR = os.path.join(
+    BASE_DIR,
+    "assets",
+    "audio"
+)
+
+SOUNDS_DIR = os.path.join(
+    AUDIO_DIR,
+    "sounds"
+)
+
+click_sound = pygame.mixer.Sound(
+    os.path.join(
+        SOUNDS_DIR,
+        "click1.ogg"
+    )
 )
 
 
@@ -231,13 +250,11 @@ class Button:
         mouse_pos = pygame.mouse.get_pos()
         hovered = self.rect.collidepoint(mouse_pos)
 
-        # Choose button colour
         if hovered:
             current_color = self.hover_color
         else:
             current_color = self.color
 
-        # Shadow
         shadow_rect = self.rect.copy()
         shadow_rect.y += 4
 
@@ -248,13 +265,11 @@ class Button:
             border_radius=14
         )
 
-        # Slight hover lift
         button_rect = self.rect.copy()
 
         if hovered:
             button_rect.y -= 2
 
-        # Main button
         pygame.draw.rect(
             win,
             current_color,
@@ -262,7 +277,6 @@ class Button:
             border_radius=14
         )
 
-        # Subtle highlight border
         pygame.draw.rect(
             win,
             (255, 255, 255),
@@ -271,7 +285,6 @@ class Button:
             border_radius=14
         )
 
-        # Button text
         txt = FONT.render(
             self.text,
             True,
@@ -286,7 +299,13 @@ class Button:
 
     def is_clicked(self, pos):
 
-        return self.rect.collidepoint(pos)
+        if self.rect.collidepoint(pos):
+
+            click_sound.play()
+
+            return True
+
+        return False
 
 
 message = ""
