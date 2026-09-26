@@ -197,6 +197,7 @@ housing_options = {
 }
 
 current_home = "Shared Room"
+current_location = "Home"
 
 
 seasons = ["Spring", "Summer", "Autumn", "Winter"]
@@ -3980,12 +3981,13 @@ def save_game():
             "inventory_foods": inventory_foods,
             "inventory_energy": inventory_energy,
             "current_home": current_home,
+            "current_location": current_location,
             "career_data": career_data
         }, f)
     show_message("Game saved!")
 
 def load_game():
-    global Balance, hunger, energy, health, day, time_of_day, inventory_foods, inventory_energy, current_home, career_data
+    global Balance, hunger, energy, health, day, time_of_day, inventory_foods, inventory_energy, current_home, career_data, current_location
     try:
         with open("save.json") as f:
             data = json.load(f)
@@ -3995,6 +3997,7 @@ def load_game():
         health = data["health"]
         day = data["day"]
         time_of_day = data["time_of_day"]
+        current_location = data.get("current_location", "Home")
         current_home = data.get("current_home", "Shared Room")
         career_data = data.get("career_data", career_data)
         inventory_foods = data.get("inventory_foods", inventory_foods)
@@ -4015,12 +4018,21 @@ def world_map():
     running = True
 
     selected_location = None
-
+    global current_location
+    
+    
+    
     back_btn = Button(
         325, 610, 200, 55,
         "Back",
         color=(107, 111, 138),
         hover_color=(133, 137, 163)
+    )
+    travel_btn = Button(
+        570, 505, 90, 45,
+        "Travel",
+        color=(80, 150, 120),
+        hover_color=(105, 175, 145)
     )
 
     locations = [
@@ -4133,7 +4145,7 @@ def world_map():
         )
 
         subtitle = FONT.render(
-            "Explore the city",
+            "Current location: " + current_location,
             True,
             muted_color
         )
@@ -4293,6 +4305,7 @@ def world_map():
                 details,
                 (430, 495)
             )
+            travel_btn.draw(WIN)
 
         # Back button
 
@@ -4313,9 +4326,24 @@ def world_map():
 
                     running = False
 
+                elif selected_location is not None and travel_btn.is_clicked(event.pos):
+
+                    current_location = selected_location
+
                 else:
 
                     for name, x, y in locations:
+
+                        location_rect = pygame.Rect(
+                            x - 40,
+                            y - 40,
+                            80,
+                            80
+                        )
+
+                        if location_rect.collidepoint(event.pos):
+
+                            selected_location = name
 
                         location_rect = pygame.Rect(
                             x - 40,
