@@ -198,6 +198,7 @@ housing_options = {
 
 current_home = "Shared Room"
 current_location = "Home"
+hour = 12
 
 
 seasons = ["Spring", "Summer", "Autumn", "Winter"]
@@ -4013,6 +4014,26 @@ def toggle_time(new_time):
     global time_of_day
     time_of_day = new_time
     show_message(f"It is now {time_of_day}")
+def advance_time(hours):
+
+    global hour
+    global day
+    global time_of_day
+
+    hour += hours
+
+    while hour >= 24:
+
+        hour -= 24
+        day += 1
+
+    if 7 <= hour < 19:
+
+        time_of_day = "Day"
+
+    else:
+
+        time_of_day = "Night"
 def world_map():
 
     running = True
@@ -4048,31 +4069,37 @@ def world_map():
         "Home": {
             "description": "Your current home",
             "travel_time": "2 hours",
+            "travel_hours": 2,
             "availability": "Always"
         },
         "Park": {
             "description": "Relax and recover some energy",
             "travel_time": "1 hour",
+            "travel_hours": 1,
             "availability": "Day"
         },
         "Café": {
             "description": "Grab a drink and take a break",
             "travel_time": "1 hour",
+            "travel_hours": 1,
             "availability": "Day"
         },
         "Supermarket": {
             "description": "Buy food and energy items",
             "travel_time": "1 hour",
+            "travel_hours": 1,
             "availability": "Day"
         },
         "Work": {
             "description": "Go to your current workplace",
             "travel_time": "2 hours",
+            "travel_hours": 2,
             "availability": "Day"
         },
         "Hospital": {
             "description": "Recover when your health is low",
             "travel_time": "2 hours",
+            "travel_hours": 2,
             "availability": "Always"
         }
     }
@@ -4145,7 +4172,9 @@ def world_map():
         )
 
         subtitle = FONT.render(
-            "Current location: " + current_location,
+            "Current location: " + current_location +
+            "   |   " +
+            f"{hour:02d}:00",
             True,
             muted_color
         )
@@ -4329,6 +4358,14 @@ def world_map():
                 elif selected_location is not None and travel_btn.is_clicked(event.pos):
 
                     current_location = selected_location
+
+                    advance_time(
+                        location_info[selected_location]["travel_hours"]
+                    )
+
+                    show_message(
+                        "Travelled to " + selected_location
+                    )
 
                 else:
 
